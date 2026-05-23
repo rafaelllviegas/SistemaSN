@@ -1,0 +1,20 @@
+# Ambiente virtual
+.venv/
+
+# PyInstaller
+build/
+dist/
+*.spec
+
+# Painel admin (fica só na sua máquina)
+admin_painel.py
+
+# Cache Python
+__pycache__/
+*.pyc
+
+# Variáveis de ambiente
+.env
+
+# VS Code
+.vscode/
