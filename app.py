@@ -288,6 +288,8 @@ def aliq_efetiva(rbt12, al, ded):
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
+        # Ícone da janela
+        self.iconbitmap("das.ico")
         self.title("Calculadora DAS — Simples Nacional")
         self.geometry("1050x820")
         self.configure(fg_color=COR_BG)
@@ -306,6 +308,12 @@ class App(ctk.CTk):
             font=ctk.CTkFont("Segoe UI", 16, "bold"),
             text_color="#F1F5F9",
         ).pack(side="left", padx=20, pady=14)
+        
+        from PIL import Image
+        import customtkinter as ctk
+
+        logo_img = ctk.CTkImage(Image.open("das.png"), size=(36, 36))
+        ctk.CTkLabel(hdr, image=logo_img, text="").pack(side="left", padx=(10,0), pady=8)
 
         # Scroll container
         scroll = ctk.CTkScrollableFrame(
