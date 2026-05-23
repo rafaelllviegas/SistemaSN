@@ -8,7 +8,7 @@ import httpx
 
 # ── Configuração ──────────────────────────────────────────────────────
 API_URL      = "https://sistemasn-production.up.railway.app"
-VERSAO_ATUAL = "1.1.2"
+VERSAO_ATUAL = "1.1.3"
 CHAVE_FILE   = os.path.join(os.path.expanduser("~"), ".das_licenca")
 
 COR_BG      = "#F1F5F9"

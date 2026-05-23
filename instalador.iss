@@ -5,7 +5,7 @@
 
 [Setup]
 AppName=Calculadora DAS
-AppVersion=1.1.2
+AppVersion=1.1.3
 AppPublisher=Rafael Viegas
 DefaultDirName={autopf}\Calculadora DAS
 DefaultGroupName=Calculadora DAS
@@ -34,12 +34,8 @@ Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortugue
 Name: "desktopicon"; Description: "Criar atalho na Área de Trabalho"; GroupDescription: "Ícones adicionais:"; Flags: unchecked
 
 [Files]
-; Arquivo principal gerado pelo PyInstaller
-Source: "dist\Calculadora DAS\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
-
-; Ícone e logo
-Source: "das.ico"; DestDir: "{app}"; Flags: ignoreversion
-Source: "das.png"; DestDir: "{app}"; Flags: ignoreversion
+; Todos os arquivos gerados pelo PyInstaller --onedir
+Source: "dist\Calculadora DAS\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 ; Atalho no menu Iniciar
