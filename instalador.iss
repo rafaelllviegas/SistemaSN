@@ -5,7 +5,7 @@
 
 [Setup]
 AppName=Calculadora DAS
-AppVersion=1.1.1
+AppVersion=1.1.2
 AppPublisher=Rafael Viegas
 DefaultDirName={autopf}\Calculadora DAS
 DefaultGroupName=Calculadora DAS
@@ -35,7 +35,7 @@ Name: "desktopicon"; Description: "Criar atalho na Área de Trabalho"; GroupDesc
 
 [Files]
 ; Arquivo principal gerado pelo PyInstaller
-Source: "dist\Calculadora DAS.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist\Calculadora DAS\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 
 ; Ícone e logo
 Source: "das.ico"; DestDir: "{app}"; Flags: ignoreversion
