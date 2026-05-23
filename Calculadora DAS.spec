@@ -5,7 +5,7 @@ a = Analysis(
     ['app.py'],
     pathex=[],
     binaries=[],
-    datas=[('das.png', '.'), ('das.ico', '.'), ('licence_module.py', '.')],
+    datas=[('das.png', '.'), ('das.ico', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

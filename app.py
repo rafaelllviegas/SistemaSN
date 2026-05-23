@@ -30,6 +30,28 @@ TRIB_CORES = {
     "ISS":    "#84CC16",
 }
 
+# ── Fontes — altere aqui para mudar todos os textos do sistema ────────
+FONTE          = "Segoe UI"   # família da fonte
+
+TAM_HEADER     = 16   # título "Calculadora DAS — Simples Nacional" no cabeçalho azul
+TAM_CARD_TITLE = 12   # títulos dos cards "DADOS DE ENTRADA", "RESULTADO POR ANEXO", "SEGREGAÇÃO DOS TRIBUTOS"
+TAM_LABEL      = 12   # labels dos campos "FATURAMENTO DO MÊS", "RBT12 — 12 MESES", "ANEXO I (%)", "ANEXO II (%)", "ANEXO III (%)"
+TAM_INPUT      = 14   # texto digitado nos 5 campos de entrada
+TAM_HINT       = 12   # "Soma dos anexos: 0,00% (precisa ser 100%)" e "✓"
+TAM_BTN        = 14   # texto dos botões "▶ Calcular DAS" e "✕ Limpar"
+TAM_MINI_LABEL = 12   # título dos cards de totais "DAS TOTAL", "ALÍQUOTA EFETIVA", "FAIXA (RBT12)"
+TAM_MINI_VALOR = 22   # valor dos cards de totais  "R$ 0,00", "—" nos três cards de totais
+TAM_TAB_HEADER = 13   # cabeçalho das tabelas "Anexo", "Faixa", "Receita", "Alíq. Nominal", "Alíq. Efetiva", "DAS Parcial", "Tributo", "% no DAS", "Valor (R$)"
+TAM_TAB_LINHA  = 13   # todas as linhas de dados das duas tabelas
+TAM_ALERTA     = 17   # texto da mensagem dentro do popup de aviso
+
+# ── Tamanhos de janela e linhas ───────────────────────────────────────
+JANELA_W       = 1200   # largura inicial da janela
+JANELA_H       = 900    # altura inicial da janela
+ALTURA_INPUT   = 44     # altura dos 5 campos de entrada
+ALTURA_BTN     = 40     # altura dos botões Calcular e Limpar
+ALTURA_LINHA   = 36     # altura de cada linha nas duas tabelas
+
 # ── Dados ─────────────────────────────────────────────────────────────
 ANEXOS = {
     "Anexo I — Comércio": {
@@ -168,48 +190,38 @@ class App(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        # Ícone da janela
         try:
             self.iconbitmap(resource_path("das.ico"))
         except Exception:
             pass
 
         self.title("Calculadora DAS — Simples Nacional")
-        self.geometry("1050x820")
+        self.geometry(f"{JANELA_W}x{JANELA_H}")
         self.configure(fg_color=COR_BG)
         self.resizable(True, True)
         self._build()
 
     # ── Layout ────────────────────────────────────────────────────────
     def _build(self):
-        # Header
         hdr = ctk.CTkFrame(self, fg_color="#1E3A5F", corner_radius=0, height=56)
         hdr.pack(fill="x")
         hdr.pack_propagate(False)
 
-        # Logo no header
         try:
-            logo_img = ctk.CTkImage(
-                Image.open(resource_path("das.png")), size=(36, 36)
-            )
-            ctk.CTkLabel(hdr, image=logo_img, text="").pack(
-                side="left", padx=(14, 0), pady=10
-            )
+            logo_img = ctk.CTkImage(Image.open(resource_path("das.png")), size=(36, 36))
+            ctk.CTkLabel(hdr, image=logo_img, text="").pack(side="left", padx=(14, 0), pady=10)
         except Exception:
             pass
 
         ctk.CTkLabel(
             hdr,
             text="  Calculadora DAS — Simples Nacional",
-            font=ctk.CTkFont("Segoe UI", 16, "bold"),
+            font=ctk.CTkFont(FONTE, TAM_HEADER, "bold"),
             text_color="#F1F5F9",
         ).pack(side="left", padx=(6, 20), pady=14)
 
-        # Scroll container
-        scroll = ctk.CTkScrollableFrame(
-            self, fg_color=COR_BG, scrollbar_button_color=COR_BORDA
-        )
-        scroll.pack(fill="both", expand=True, padx=0, pady=0)
+        scroll = ctk.CTkScrollableFrame(self, fg_color=COR_BG, scrollbar_button_color=COR_BORDA)
+        scroll.pack(fill="both", expand=True)
 
         self._card_entrada(scroll)
 
@@ -217,9 +229,9 @@ class App(ctk.CTk):
         frame_totais.pack(fill="x", padx=20, pady=(0, 16))
         frame_totais.columnconfigure((0, 1, 2), weight=1)
 
-        self.lbl_das   = self._mini_card(frame_totais, "DAS TOTAL",         "R$ 0,00", COR_VERDE,    0)
-        self.lbl_aliq  = self._mini_card(frame_totais, "ALÍQUOTA EFETIVA",  "—",        COR_PRIMARIA, 1)
-        self.lbl_faixa = self._mini_card(frame_totais, "FAIXA (RBT12)",     "—",        COR_AMARELO,  2)
+        self.lbl_das   = self._mini_card(frame_totais, "DAS TOTAL",        "R$ 0,00", COR_VERDE,    0)
+        self.lbl_aliq  = self._mini_card(frame_totais, "ALÍQUOTA EFETIVA", "—",        COR_PRIMARIA, 1)
+        self.lbl_faixa = self._mini_card(frame_totais, "FAIXA (RBT12)",    "—",        COR_AMARELO,  2)
 
         self._card_resultado(scroll)
         self._card_segregacao(scroll)
@@ -228,13 +240,12 @@ class App(ctk.CTk):
         outer = ctk.CTkFrame(parent, fg_color=COR_CARD, corner_radius=16)
         outer.pack(fill="x", padx=20, pady=(0, 16))
 
-        hdr = ctk.CTkFrame(outer, fg_color=cor_titulo, corner_radius=12, height=36)
+        hdr = ctk.CTkFrame(outer, fg_color=cor_titulo, corner_radius=12, height=38)
         hdr.pack(fill="x", padx=2, pady=(2, 0))
         hdr.pack_propagate(False)
         ctk.CTkLabel(
-            hdr,
-            text=titulo,
-            font=ctk.CTkFont("Segoe UI", 10, "bold"),
+            hdr, text=titulo,
+            font=ctk.CTkFont(FONTE, TAM_CARD_TITLE, "bold"),
             text_color="white",
         ).pack(side="left", padx=14)
 
@@ -244,15 +255,15 @@ class App(ctk.CTk):
 
     def _mini_card(self, parent, titulo, valor, cor, col):
         f = ctk.CTkFrame(parent, fg_color=COR_CARD, corner_radius=16)
-        f.grid(row=0, column=col, padx=(0 if col == 0 else 8, 0), sticky="ew", pady=0)
+        f.grid(row=0, column=col, padx=(0 if col == 0 else 8, 0), sticky="ew")
         ctk.CTkLabel(
             f, text=titulo,
-            font=ctk.CTkFont("Segoe UI", 9, "bold"),
+            font=ctk.CTkFont(FONTE, TAM_MINI_LABEL, "bold"),
             text_color=COR_SUBTEXTO,
         ).pack(pady=(14, 2))
         lbl = ctk.CTkLabel(
             f, text=valor,
-            font=ctk.CTkFont("Segoe UI", 18, "bold"),
+            font=ctk.CTkFont(FONTE, TAM_MINI_VALOR, "bold"),
             text_color=cor,
         )
         lbl.pack(pady=(0, 14))
@@ -262,14 +273,14 @@ class App(ctk.CTk):
         e = ctk.CTkEntry(
             parent,
             placeholder_text=placeholder,
-            font=ctk.CTkFont("Segoe UI", 12),
+            font=ctk.CTkFont(FONTE, TAM_INPUT),
             fg_color=COR_CARD2,
             border_color=COR_BORDA,
             border_width=1,
             text_color=COR_TEXTO,
             placeholder_text_color=COR_SUBTEXTO,
             corner_radius=10,
-            height=40,
+            height=ALTURA_INPUT,
         )
         e.grid(row=row, column=col, padx=8, pady=(0, 8), sticky="ew")
         e.bind("<KeyRelease>", bind_fn)
@@ -278,7 +289,7 @@ class App(ctk.CTk):
     def _label(self, parent, texto, row, col):
         ctk.CTkLabel(
             parent, text=texto,
-            font=ctk.CTkFont("Segoe UI", 9, "bold"),
+            font=ctk.CTkFont(FONTE, TAM_LABEL, "bold"),
             text_color=COR_SUBTEXTO,
         ).grid(row=row, column=col, padx=8, pady=(10, 2), sticky="w")
 
@@ -311,7 +322,7 @@ class App(ctk.CTk):
         self.lbl_pct = ctk.CTkLabel(
             row_hint,
             text="Soma dos anexos: 0,00%  (precisa ser 100%)",
-            font=ctk.CTkFont("Segoe UI", 10),
+            font=ctk.CTkFont(FONTE, TAM_HINT),
             text_color=COR_SUBTEXTO,
         )
         self.lbl_pct.pack(side="left")
@@ -320,24 +331,24 @@ class App(ctk.CTk):
             row_hint, text="✕  Limpar",
             command=self._limpar,
             fg_color="#334155", hover_color="#475569",
-            font=ctk.CTkFont("Segoe UI", 11, "bold"),
+            font=ctk.CTkFont(FONTE, TAM_BTN, "bold"),
             text_color="white",
-            corner_radius=10, height=36, width=110,
+            corner_radius=10, height=ALTURA_BTN, width=120,
         ).pack(side="right", padx=(8, 0))
 
         ctk.CTkButton(
             row_hint, text="▶  Calcular DAS",
             command=self._calcular,
             fg_color=COR_VERDE, hover_color="#2563EB",
-            font=ctk.CTkFont("Segoe UI", 11, "bold"),
-            corner_radius=10, height=36, width=150,
+            font=ctk.CTkFont(FONTE, TAM_BTN, "bold"),
+            corner_radius=10, height=ALTURA_BTN, width=160,
         ).pack(side="right")
 
     # ── Resultado por Anexo ───────────────────────────────────────────
     def _card_resultado(self, parent):
         body = self._card(parent, "RESULTADO POR ANEXO", "#1E3A5F")
         colunas  = ["Anexo", "Faixa", "Receita", "Alíq. Nominal", "Alíq. Efetiva", "DAS Parcial"]
-        larguras = [220, 80, 150, 120, 120, 140]
+        larguras = [260, 90, 170, 140, 140, 160]
         self._cabecalho_tabela(body, colunas, larguras, 0)
         self.rows_res = self._linhas_tabela(body, 3, colunas, larguras, 1)
 
@@ -345,12 +356,12 @@ class App(ctk.CTk):
     def _card_segregacao(self, parent):
         body = self._card(parent, "SEGREGAÇÃO DOS TRIBUTOS", "#5B21B6")
         colunas  = ["Tributo", "Anexo", "% no DAS", "Valor (R$)"]
-        larguras = [100, 200, 100, 150]
+        larguras = [120, 240, 120, 180]
         self._cabecalho_tabela(body, colunas, larguras, 0)
         self.rows_seg = self._linhas_tabela(body, 10, colunas, larguras, 1)
 
     def _cabecalho_tabela(self, parent, colunas, larguras, row):
-        hdr = ctk.CTkFrame(parent, fg_color=COR_CARD2, corner_radius=10, height=34)
+        hdr = ctk.CTkFrame(parent, fg_color=COR_CARD2, corner_radius=10, height=36)
         hdr.grid(row=row, column=0, sticky="ew", pady=(0, 2))
         parent.columnconfigure(0, weight=1)
         hdr.pack_propagate(False)
@@ -361,7 +372,7 @@ class App(ctk.CTk):
         for i, (col, w) in enumerate(zip(colunas, larguras)):
             ctk.CTkLabel(
                 row_f, text=col, width=w,
-                font=ctk.CTkFont("Segoe UI", 9, "bold"),
+                font=ctk.CTkFont(FONTE, TAM_TAB_HEADER, "bold"),
                 text_color=COR_SUBTEXTO,
                 anchor="w" if i == 0 else "center",
             ).pack(side="left")
@@ -370,7 +381,7 @@ class App(ctk.CTk):
         rows = []
         for i in range(n_rows):
             cor   = COR_CARD if i % 2 == 0 else COR_CARD2
-            row_f = ctk.CTkFrame(parent, fg_color=cor, corner_radius=8, height=32)
+            row_f = ctk.CTkFrame(parent, fg_color=cor, corner_radius=8, height=ALTURA_LINHA)
             row_f.grid(row=start_row + i, column=0, sticky="ew", pady=1)
             row_f.pack_propagate(False)
 
@@ -381,7 +392,7 @@ class App(ctk.CTk):
             for j, (col, w) in enumerate(zip(colunas, larguras)):
                 lbl = ctk.CTkLabel(
                     inner, text="", width=w,
-                    font=ctk.CTkFont("Segoe UI", 10),
+                    font=ctk.CTkFont(FONTE, TAM_TAB_LINHA),
                     text_color=COR_TEXTO,
                     anchor="w" if j == 0 else "center",
                 )
@@ -440,9 +451,9 @@ class App(ctk.CTk):
             e.delete(0, "end")
         self._limpar_rows(self.rows_res)
         self._limpar_rows(self.rows_seg)
-        self.lbl_das.configure(text="R$ 0,00",  text_color=COR_VERDE)
-        self.lbl_aliq.configure(text="—",         text_color=COR_PRIMARIA)
-        self.lbl_faixa.configure(text="—",        text_color=COR_AMARELO)
+        self.lbl_das.configure(text="R$ 0,00", text_color=COR_VERDE)
+        self.lbl_aliq.configure(text="—",       text_color=COR_PRIMARIA)
+        self.lbl_faixa.configure(text="—",      text_color=COR_AMARELO)
         self.lbl_pct.configure(
             text="Soma dos anexos: 0,00%  (precisa ser 100%)",
             text_color=COR_SUBTEXTO,
@@ -458,12 +469,12 @@ class App(ctk.CTk):
         win.grab_set()
         ctk.CTkLabel(
             win, text="⚠  Atenção",
-            font=ctk.CTkFont("Segoe UI", 14, "bold"),
+            font=ctk.CTkFont(FONTE, 14, "bold"),
             text_color=COR_AMARELO,
         ).pack(pady=(24, 10))
         ctk.CTkLabel(
             win, text=msg,
-            font=ctk.CTkFont("Segoe UI", 11),
+            font=ctk.CTkFont(FONTE, TAM_ALERTA),
             text_color=COR_TEXTO,
             wraplength=360,
         ).pack(padx=20)

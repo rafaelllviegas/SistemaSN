@@ -1,19 +1,13 @@
 """
-Módulo de Licenciamento — integre no seu app desktop.
-
-Como usar no calculadora_das_ctk.py:
-    from license_module import LicenseManager
-    lm = LicenseManager()
-    lm.verificar_na_abertura(root)  # chame antes de root.mainloop()
+Módulo de Licenciamento — Calculadora DAS
 """
 
-import os, sys, uuid, platform, hashlib, json, threading, subprocess, tempfile
-import tkinter as tk
+import os, sys, platform, hashlib, json, threading, subprocess, tempfile
 import customtkinter as ctk
 import httpx
 
 # ── Configuração ──────────────────────────────────────────────────────
-API_URL      = "https://sistemasn-production.up.railway.app"   # ← troque pela URL do Railway
+API_URL      = "https://sistemasn-production.up.railway.app"
 VERSAO_ATUAL = "1.0.0"
 CHAVE_FILE   = os.path.join(os.path.expanduser("~"), ".das_licenca")
 
@@ -28,12 +22,11 @@ COR_ERRO    = "#DC2626"
 
 # ── Machine ID ────────────────────────────────────────────────────────
 def get_machine_id() -> str:
-    """Gera um ID único e estável para esta máquina."""
     raw = f"{platform.node()}-{platform.machine()}-{platform.processor()}"
     return hashlib.sha256(raw.encode()).hexdigest()[:32]
 
 
-# ── Persistência local da chave ───────────────────────────────────────
+# ── Chave local ───────────────────────────────────────────────────────
 def salvar_chave(chave: str):
     with open(CHAVE_FILE, "w") as f:
         json.dump({"chave": chave}, f)
@@ -53,20 +46,14 @@ def apagar_chave():
 
 
 # ══════════════════════════════════════════════════════════════════════
-# MANAGER
-# ══════════════════════════════════════════════════════════════════════
 class LicenseManager:
 
     def __init__(self):
         self.machine_id = get_machine_id()
         self.cliente    = None
 
-    # ── Ponto de entrada principal ────────────────────────────────────
+    # ── Ponto de entrada ──────────────────────────────────────────────
     def verificar_na_abertura(self, root: ctk.CTk):
-        """
-        Chame antes de root.mainloop().
-        Bloqueia a abertura até a licença ser validada.
-        """
         chave_salva = carregar_chave()
 
         if chave_salva:
@@ -81,7 +68,7 @@ class LicenseManager:
         else:
             self._tela_ativacao(root)
 
-    # ── Validação na API ──────────────────────────────────────────────
+    # ── Validação ─────────────────────────────────────────────────────
     def _validar_online(self, chave: str) -> tuple[bool, str, str | None]:
         try:
             r = httpx.post(
@@ -93,10 +80,9 @@ class LicenseManager:
                 data = r.json()
                 return True, data["mensagem"], data["cliente"]
             else:
-                detail = r.json().get("detail", "Erro desconhecido.")
-                return False, detail, None
+                return False, r.json().get("detail", "Erro desconhecido."), None
         except httpx.ConnectError:
-            return False, "Sem conexão com o servidor de licenças.\nVerifique sua internet.", None
+            return False, "Sem conexão com o servidor.\nVerifique sua internet.", None
         except Exception as e:
             return False, f"Erro ao validar licença: {e}", None
 
@@ -113,7 +99,6 @@ class LicenseManager:
         win.grab_set()
         win.focus_force()
 
-        # Header
         hdr = ctk.CTkFrame(win, fg_color="#1E3A5F", corner_radius=0, height=52)
         hdr.pack(fill="x")
         hdr.pack_propagate(False)
@@ -124,17 +109,14 @@ class LicenseManager:
         body = ctk.CTkFrame(win, fg_color=COR_CARD)
         body.pack(fill="both", expand=True, padx=32, pady=24)
 
-        ctk.CTkLabel(body,
-                     text="Calculadora DAS — Simples Nacional",
+        ctk.CTkLabel(body, text="Calculadora DAS — Simples Nacional",
                      font=ctk.CTkFont("Segoe UI", 13, "bold"),
-                     text_color=COR_TEXTO).pack(pady=(0,4))
+                     text_color=COR_TEXTO).pack(pady=(0, 4))
 
-        ctk.CTkLabel(body,
-                     text="Digite sua chave de licença para continuar.",
+        ctk.CTkLabel(body, text="Digite sua chave de licença para continuar.",
                      font=ctk.CTkFont("Segoe UI", 11),
-                     text_color=COR_SUB).pack(pady=(0,20))
+                     text_color=COR_SUB).pack(pady=(0, 20))
 
-        # Campo da chave
         entry = ctk.CTkEntry(
             body, placeholder_text="XXXX-XXXX-XXXX-XXXX",
             font=ctk.CTkFont("Segoe UI", 13, "bold"),
@@ -142,15 +124,13 @@ class LicenseManager:
             text_color=COR_TEXTO, height=44,
             corner_radius=10, justify="center",
         )
-        entry.pack(fill="x", pady=(0,6))
+        entry.pack(fill="x", pady=(0, 6))
 
-        # Mensagem de erro (se houver)
         lbl_erro = ctk.CTkLabel(body, text=erro or "",
                                 font=ctk.CTkFont("Segoe UI", 10),
                                 text_color=COR_ERRO, wraplength=380)
-        lbl_erro.pack(pady=(0,16))
+        lbl_erro.pack(pady=(0, 16))
 
-        # Botão ativar
         def ativar():
             chave = entry.get().strip().upper()
             if len(chave) != 19:
@@ -178,17 +158,15 @@ class LicenseManager:
             corner_radius=10, height=42,
         )
         btn.pack(fill="x")
-
         entry.bind("<Return>", lambda e: ativar())
 
-        ctk.CTkLabel(body,
-                     text="Não tem uma licença? Contate o suporte.",
+        ctk.CTkLabel(body, text="Não tem uma licença? Contate o suporte.",
                      font=ctk.CTkFont("Segoe UI", 9),
-                     text_color=COR_SUB).pack(pady=(16,0))
+                     text_color=COR_SUB).pack(pady=(16, 0))
 
         win.wait_window()
 
-    # ── Update automático ─────────────────────────────────────────────
+    # ── Verificar update ──────────────────────────────────────────────
     def _verificar_update(self, root: ctk.CTk):
         def _check():
             try:
@@ -198,78 +176,141 @@ class LicenseManager:
                     return
                 data = r.json()
                 if not data["atualizado"]:
-                    root.after(0, lambda: self._tela_update(root, data))
+                    root.after(0, lambda: self._popup_update(root, data))
             except Exception:
-                pass  # sem internet: ignora o update silenciosamente
+                pass
 
         threading.Thread(target=_check, daemon=True).start()
 
-    def _tela_update(self, root: ctk.CTk, data: dict):
+    # ── Popup de update ───────────────────────────────────────────────
+    def _popup_update(self, root: ctk.CTk, data: dict):
         win = ctk.CTkToplevel(root)
         win.title("Atualização disponível")
-        win.geometry("420x280")
+        win.geometry("440x300")
         win.configure(fg_color=COR_CARD)
         win.resizable(False, False)
         win.transient(root)
         win.grab_set()
 
-        hdr = ctk.CTkFrame(win, fg_color=COR_VERDE, corner_radius=0, height=46)
-        hdr.pack(fill="x"); hdr.pack_propagate(False)
+        # Header verde
+        hdr = ctk.CTkFrame(win, fg_color=COR_VERDE, corner_radius=0, height=50)
+        hdr.pack(fill="x")
+        hdr.pack_propagate(False)
         ctk.CTkLabel(hdr, text=f"🆕  Nova versão disponível: {data['versao']}",
-                     font=ctk.CTkFont("Segoe UI", 12, "bold"),
-                     text_color="white").pack(side="left", padx=16, pady=10)
+                     font=ctk.CTkFont("Segoe UI", 13, "bold"),
+                     text_color="white").pack(side="left", padx=16, pady=12)
 
         body = ctk.CTkFrame(win, fg_color=COR_CARD)
         body.pack(fill="both", expand=True, padx=28, pady=20)
 
-        ctk.CTkLabel(body, text=f"Versão atual: {VERSAO_ATUAL}  →  Nova: {data['versao']}",
+        ctk.CTkLabel(body,
+                     text=f"Versão atual: {VERSAO_ATUAL}   →   Nova versão: {data['versao']}",
                      font=ctk.CTkFont("Segoe UI", 11, "bold"),
-                     text_color=COR_TEXTO).pack(pady=(0,8))
+                     text_color=COR_TEXTO).pack(pady=(0, 6))
 
         if data.get("notas"):
             ctk.CTkLabel(body, text=data["notas"],
                          font=ctk.CTkFont("Segoe UI", 10),
-                         text_color=COR_SUB, wraplength=360).pack(pady=(0,16))
+                         text_color=COR_SUB, wraplength=370).pack(pady=(0, 12))
 
+        # Barra de progresso (oculta até clicar Sim)
         lbl_prog = ctk.CTkLabel(body, text="",
                                 font=ctk.CTkFont("Segoe UI", 10),
                                 text_color=COR_SUB)
         lbl_prog.pack()
 
-        def baixar():
-            btn_atualizar.configure(state="disabled", text="Baixando...")
-            lbl_prog.configure(text="Aguarde, baixando atualização...")
+        barra = ctk.CTkProgressBar(body, width=360, height=12,
+                                   corner_radius=6,
+                                   fg_color="#E2E8F0",
+                                   progress_color=COR_VERDE)
+        barra.set(0)
+
+        def iniciar_update():
+            btn_sim.configure(state="disabled", text="Baixando...")
+            btn_nao.configure(state="disabled")
+            barra.pack(pady=(8, 0))
+            lbl_prog.configure(text="Preparando atualização...")
             win.update()
 
             def _download():
                 try:
-                    with httpx.stream("GET", data["url"], follow_redirects=True) as resp:
-                        tmp = tempfile.NamedTemporaryFile(suffix=".exe", delete=False)
-                        for chunk in resp.iter_bytes(chunk_size=8192):
-                            tmp.write(chunk)
-                        tmp.close()
-                    # Abre o instalador e fecha o app atual
-                    subprocess.Popen([tmp.name])
-                    root.after(0, sys.exit)
+                    url = data["url"]
+
+                    # Descobre tamanho total
+                    head = httpx.head(url, follow_redirects=True, timeout=10)
+                    total = int(head.headers.get("content-length", 0))
+
+                    # Salva na mesma pasta do executável atual
+                    if hasattr(sys, "_MEIPASS"):
+                        dest_dir = os.path.dirname(sys.executable)
+                    else:
+                        dest_dir = os.path.dirname(os.path.abspath(__file__))
+
+                    installer_path = os.path.join(dest_dir, "_update_installer.exe")
+
+                    baixado = 0
+                    with httpx.stream("GET", url, follow_redirects=True, timeout=60) as resp:
+                        with open(installer_path, "wb") as f:
+                            for chunk in resp.iter_bytes(chunk_size=65536):
+                                f.write(chunk)
+                                baixado += len(chunk)
+                                if total > 0:
+                                    pct = baixado / total
+                                    mb_baixado = baixado / 1_048_576
+                                    mb_total   = total   / 1_048_576
+                                    root.after(0, lambda p=pct, b=mb_baixado, t=mb_total: (
+                                        barra.set(p),
+                                        lbl_prog.configure(
+                                            text=f"Baixando... {b:.1f} MB de {t:.1f} MB  ({p*100:.0f}%)"
+                                        )
+                                    ))
+
+                    root.after(0, lambda: lbl_prog.configure(
+                        text="✓ Download concluído. Iniciando instalação..."))
+                    root.after(0, lambda: barra.set(1))
+                    root.after(800, lambda: _instalar(installer_path))
+
                 except Exception as e:
                     root.after(0, lambda: lbl_prog.configure(
-                        text=f"Erro no download: {e}", text_color=COR_ERRO))
-                    root.after(0, lambda: btn_atualizar.configure(
+                        text=f"✗ Erro: {e}", text_color=COR_ERRO))
+                    root.after(0, lambda: btn_sim.configure(
                         state="normal", text="Tentar novamente"))
+                    root.after(0, lambda: btn_nao.configure(state="normal"))
+
+            def _instalar(installer_path):
+                """
+                Executa o instalador Inno Setup com flag /silent.
+                O instalador vai: fechar o app atual → substituir o .exe → reabrir.
+                """
+                try:
+                    subprocess.Popen(
+                        [installer_path, "/silent", "/closeapplications", "/restartapplications"],
+                        creationflags=subprocess.DETACHED_PROCESS
+                            if sys.platform == "win32" else 0
+                    )
+                    root.after(500, root.destroy)
+                    root.after(600, sys.exit)
+                except Exception as e:
+                    root.after(0, lambda: lbl_prog.configure(
+                        text=f"✗ Erro ao instalar: {e}", text_color=COR_ERRO))
 
             threading.Thread(target=_download, daemon=True).start()
 
-        btn_atualizar = ctk.CTkButton(
-            body, text="Baixar e instalar agora", command=baixar,
+        btn_sim = ctk.CTkButton(
+            body, text="✓  Sim, atualizar agora",
+            command=iniciar_update,
             fg_color=COR_VERDE, hover_color="#047857",
             font=ctk.CTkFont("Segoe UI", 12, "bold"),
-            corner_radius=10, height=40,
+            corner_radius=10, height=42,
         )
-        btn_atualizar.pack(fill="x", pady=(8,0))
+        btn_sim.pack(fill="x", pady=(12, 6))
 
-        ctk.CTkButton(
-            body, text="Agora não", command=win.destroy,
+        btn_nao = ctk.CTkButton(
+            body, text="Agora não",
+            command=win.destroy,
             fg_color="#E2E8F0", hover_color="#CBD5E1",
-            text_color=COR_TEXTO, font=ctk.CTkFont("Segoe UI", 11),
+            text_color=COR_TEXTO,
+            font=ctk.CTkFont("Segoe UI", 11),
             corner_radius=10, height=36,
-        ).pack(fill="x", pady=(8,0))
+        )
+        btn_nao.pack(fill="x")
