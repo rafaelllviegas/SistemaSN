@@ -712,5 +712,9 @@ class App(ctk.CTk):
 
 
 if __name__ == "__main__":
+    from licence_module import LicenseManager
+
     app = App()
+    lm = LicenseManager()
+    lm.verificar_na_abertura(app)
     app.mainloop()
