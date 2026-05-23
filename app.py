@@ -352,9 +352,9 @@ class App(ctk.CTk):
         self._cabecalho_tabela(body, colunas, larguras, 0)
         self.rows_res = self._linhas_tabela(body, 3, colunas, larguras, 1)
 
-    # ── Segregação ────────────────────────────────────────────────────
+    # ── Escalonamento ────────────────────────────────────────────────────
     def _card_segregacao(self, parent):
-        body = self._card(parent, "SEGREGAÇÃO DOS TRIBUTOS", "#5B21B6")
+        body = self._card(parent, "ESCALONAMENTO DOS TRIBUTOS", "#5B21B6")
         colunas  = ["Tributo", "Anexo", "% no DAS", "Valor (R$)"]
         larguras = [120, 240, 120, 180]
         self._cabecalho_tabela(body, colunas, larguras, 0)
