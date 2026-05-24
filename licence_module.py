@@ -1,23 +1,28 @@
 """
 Módulo de Licenciamento — Calculadora DAS
+Inclui: ativação, cadastro, trial, pagamento PIX e update automático.
 """
 
-import os, sys, platform, hashlib, json, threading, subprocess, tempfile
+import os, sys, platform, hashlib, json, threading, subprocess, base64, io
 import customtkinter as ctk
+from PIL import Image
 import httpx
 
 # ── Configuração ──────────────────────────────────────────────────────
 API_URL      = "https://sistemasn-production.up.railway.app"
-VERSAO_ATUAL = "1.1.4"
+VERSAO_ATUAL = "1.1.5"
 CHAVE_FILE   = os.path.join(os.path.expanduser("~"), ".das_licenca")
 
-COR_BG      = "#F1F5F9"
-COR_CARD    = "#FFFFFF"
-COR_TEXTO   = "#1E293B"
-COR_SUB     = "#64748B"
-COR_AZUL    = "#2563EB"
-COR_VERDE   = "#059669"
-COR_ERRO    = "#DC2626"
+# ── Cores ─────────────────────────────────────────────────────────────
+COR_CARD   = "#FFFFFF"
+COR_TEXTO  = "#1E293B"
+COR_SUB    = "#64748B"
+COR_AZUL   = "#2563EB"
+COR_VERDE  = "#059669"
+COR_ERRO   = "#DC2626"
+COR_FUNDO  = "#F1F5F9"
+COR_HEADER = "#1E3A5F"
+COR_BORDA  = "#E2E8F0"
 
 
 # ── Machine ID ────────────────────────────────────────────────────────
@@ -26,7 +31,7 @@ def get_machine_id() -> str:
     return hashlib.sha256(raw.encode()).hexdigest()[:32]
 
 
-# ── Chave local ───────────────────────────────────────────────────────
+# ── Persistência da chave ─────────────────────────────────────────────
 def salvar_chave(chave: str):
     with open(CHAVE_FILE, "w") as f:
         json.dump({"chave": chave}, f)
@@ -45,31 +50,64 @@ def apagar_chave():
         pass
 
 
+# ── Helpers UI ────────────────────────────────────────────────────────
+def _header(win, texto: str):
+    hdr = ctk.CTkFrame(win, fg_color=COR_HEADER, corner_radius=0, height=52)
+    hdr.pack(fill="x")
+    hdr.pack_propagate(False)
+    ctk.CTkLabel(hdr, text=texto,
+                 font=ctk.CTkFont("Segoe UI", 14, "bold"),
+                 text_color="white").pack(side="left", padx=20, pady=12)
+    return hdr
+
+def _base_win(root, titulo, w, h):
+    win = ctk.CTkToplevel()
+    win.title(titulo)
+    win.geometry(f"{w}x{h}")
+    win.configure(fg_color=COR_CARD)
+    win.resizable(False, False)
+    win.protocol("WM_DELETE_WINDOW", sys.exit)
+    win.grab_set()
+    win.focus_force()
+    return win
+
+
 # ══════════════════════════════════════════════════════════════════════
 class LicenseManager:
 
     def __init__(self):
         self.machine_id = get_machine_id()
         self.cliente    = None
+        self._chave     = None
 
     # ── Ponto de entrada ──────────────────────────────────────────────
     def verificar_na_abertura(self, root: ctk.CTk):
         chave_salva = carregar_chave()
 
         if chave_salva:
-            ok, msg, cliente = self._validar_online(chave_salva)
+            self._chave = chave_salva
+            ok, codigo, cliente = self._validar_online(chave_salva)
+
             if ok:
                 self.cliente = cliente
                 self._verificar_update(root)
                 return
+
+            elif codigo == 402:
+                # Trial expirado — mostra tela de pagamento
+                root.withdraw()
+                self._tela_pagamento(root, chave_salva)
+                return
+
             else:
                 apagar_chave()
-                self._tela_ativacao(root, erro=msg)
+                self._tela_ativacao(root, erro=cliente)
         else:
             self._tela_ativacao(root)
 
     # ── Validação ─────────────────────────────────────────────────────
-    def _validar_online(self, chave: str) -> tuple[bool, str, str | None]:
+    def _validar_online(self, chave: str) -> tuple[bool, int, str | None]:
+        """Retorna (ok, http_status, cliente_ou_erro)"""
         try:
             r = httpx.post(
                 f"{API_URL}/validar",
@@ -78,33 +116,23 @@ class LicenseManager:
             )
             if r.status_code == 200:
                 data = r.json()
-                return True, data["mensagem"], data["cliente"]
+                return True, 200, data["cliente"]
             else:
-                return False, r.json().get("detail", "Erro desconhecido."), None
+                detail = r.json().get("detail", "Erro desconhecido.")
+                return False, r.status_code, detail
         except httpx.ConnectError:
-            return False, "Sem conexão com o servidor.\nVerifique sua internet.", None
+            return False, 0, "Sem conexão com o servidor.\nVerifique sua internet."
         except Exception as e:
-            return False, f"Erro ao validar licença: {e}", None
+            return False, 0, f"Erro: {e}"
 
-    # ── Tela de ativação ──────────────────────────────────────────────
+    # ══════════════════════════════════════════════════════════════════
+    # TELA DE ATIVAÇÃO (com botão Criar conta)
+    # ══════════════════════════════════════════════════════════════════
     def _tela_ativacao(self, root: ctk.CTk, erro: str = None):
         root.withdraw()
+        win = _base_win(root, "Ativação — Calculadora DAS", 480, 420)
 
-        win = ctk.CTkToplevel()
-        win.title("Ativação — Calculadora DAS")
-        win.geometry("460x380")
-        win.configure(fg_color=COR_CARD)
-        win.resizable(False, False)
-        win.protocol("WM_DELETE_WINDOW", sys.exit)
-        win.grab_set()
-        win.focus_force()
-
-        hdr = ctk.CTkFrame(win, fg_color="#1E3A5F", corner_radius=0, height=52)
-        hdr.pack(fill="x")
-        hdr.pack_propagate(False)
-        ctk.CTkLabel(hdr, text="🔐  Ativação de Licença",
-                     font=ctk.CTkFont("Segoe UI", 14, "bold"),
-                     text_color="white").pack(side="left", padx=20, pady=12)
+        _header(win, "🔐  Ativação de Licença")
 
         body = ctk.CTkFrame(win, fg_color=COR_CARD)
         body.pack(fill="both", expand=True, padx=32, pady=24)
@@ -115,12 +143,12 @@ class LicenseManager:
 
         ctk.CTkLabel(body, text="Digite sua chave de licença para continuar.",
                      font=ctk.CTkFont("Segoe UI", 11),
-                     text_color=COR_SUB).pack(pady=(0, 20))
+                     text_color=COR_SUB).pack(pady=(0, 16))
 
         entry = ctk.CTkEntry(
             body, placeholder_text="XXXX-XXXX-XXXX-XXXX",
             font=ctk.CTkFont("Segoe UI", 13, "bold"),
-            fg_color="#F8FAFC", border_color="#E2E8F0",
+            fg_color="#F8FAFC", border_color=COR_BORDA,
             text_color=COR_TEXTO, height=44,
             corner_radius=10, justify="center",
         )
@@ -128,45 +156,378 @@ class LicenseManager:
 
         lbl_erro = ctk.CTkLabel(body, text=erro or "",
                                 font=ctk.CTkFont("Segoe UI", 10),
-                                text_color=COR_ERRO, wraplength=380)
-        lbl_erro.pack(pady=(0, 16))
+                                text_color=COR_ERRO, wraplength=400)
+        lbl_erro.pack(pady=(0, 12))
 
         def ativar():
             chave = entry.get().strip().upper()
             if len(chave) != 19:
                 lbl_erro.configure(text="Formato inválido. Use: XXXX-XXXX-XXXX-XXXX")
                 return
-            btn.configure(state="disabled", text="Validando...")
+            btn_ativar.configure(state="disabled", text="Validando...")
             win.update()
 
-            ok, msg, cliente = self._validar_online(chave)
+            ok, codigo, resultado = self._validar_online(chave)
 
             if ok:
                 salvar_chave(chave)
-                self.cliente = cliente
+                self._chave  = chave
+                self.cliente = resultado
                 win.destroy()
                 root.deiconify()
                 self._verificar_update(root)
-            else:
-                btn.configure(state="normal", text="Ativar")
-                lbl_erro.configure(text=msg)
 
-        btn = ctk.CTkButton(
-            body, text="Ativar", command=ativar,
+            elif codigo == 402:
+                salvar_chave(chave)
+                self._chave = chave
+                win.destroy()
+                self._tela_pagamento(root, chave)
+
+            else:
+                btn_ativar.configure(state="normal", text="Ativar")
+                lbl_erro.configure(text=resultado)
+
+        btn_ativar = ctk.CTkButton(
+            body, text="Ativar",
+            command=ativar,
             fg_color=COR_AZUL, hover_color="#1D4ED8",
             font=ctk.CTkFont("Segoe UI", 12, "bold"),
             corner_radius=10, height=42,
         )
-        btn.pack(fill="x")
+        btn_ativar.pack(fill="x", pady=(0, 10))
         entry.bind("<Return>", lambda e: ativar())
 
-        ctk.CTkLabel(body, text="Não tem uma licença? Contate o suporte.",
-                     font=ctk.CTkFont("Segoe UI", 9),
-                     text_color=COR_SUB).pack(pady=(16, 0))
+        # Separador
+        sep = ctk.CTkFrame(body, fg_color=COR_BORDA, height=1)
+        sep.pack(fill="x", pady=(4, 14))
+
+        ctk.CTkLabel(body, text="Ainda não tem uma conta?",
+                     font=ctk.CTkFont("Segoe UI", 10),
+                     text_color=COR_SUB).pack()
+
+        def abrir_cadastro():
+            win.destroy()
+            self._tela_cadastro(root)
+
+        ctk.CTkButton(
+            body, text="✨  Criar conta grátis — 30 dias sem custo",
+            command=abrir_cadastro,
+            fg_color=COR_VERDE, hover_color="#047857",
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
+            corner_radius=10, height=40,
+        ).pack(fill="x", pady=(8, 0))
 
         win.wait_window()
 
-    # ── Verificar update ──────────────────────────────────────────────
+    # ══════════════════════════════════════════════════════════════════
+    # TELA DE CADASTRO
+    # ══════════════════════════════════════════════════════════════════
+    def _tela_cadastro(self, root: ctk.CTk):
+        win = _base_win(root, "Criar conta — Calculadora DAS", 480, 420)
+
+        _header(win, "✨  Criar conta gratuita")
+
+        body = ctk.CTkFrame(win, fg_color=COR_CARD)
+        body.pack(fill="both", expand=True, padx=32, pady=24)
+
+        ctk.CTkLabel(body, text="30 dias grátis, sem cartão de crédito",
+                     font=ctk.CTkFont("Segoe UI", 13, "bold"),
+                     text_color=COR_VERDE).pack(pady=(0, 6))
+
+        ctk.CTkLabel(body,
+                     text="Após o trial, apenas R$ 4,99/mês via PIX.\nSua chave de acesso será enviada para o email.",
+                     font=ctk.CTkFont("Segoe UI", 11),
+                     text_color=COR_SUB, justify="center").pack(pady=(0, 20))
+
+        # Nome
+        ctk.CTkLabel(body, text="NOME (opcional)",
+                     font=ctk.CTkFont("Segoe UI", 9, "bold"),
+                     text_color=COR_SUB).pack(anchor="w")
+        e_nome = ctk.CTkEntry(body, placeholder_text="Seu nome",
+                              fg_color="#F8FAFC", border_color=COR_BORDA,
+                              text_color=COR_TEXTO, height=40, corner_radius=10)
+        e_nome.pack(fill="x", pady=(2, 10))
+
+        # Email
+        ctk.CTkLabel(body, text="SEU EMAIL  *",
+                     font=ctk.CTkFont("Segoe UI", 9, "bold"),
+                     text_color=COR_SUB).pack(anchor="w")
+        e_email = ctk.CTkEntry(body, placeholder_text="seu@email.com",
+                               fg_color="#F8FAFC", border_color=COR_BORDA,
+                               text_color=COR_TEXTO, height=40, corner_radius=10)
+        e_email.pack(fill="x", pady=(2, 6))
+
+        lbl_msg = ctk.CTkLabel(body, text="",
+                               font=ctk.CTkFont("Segoe UI", 10),
+                               text_color=COR_ERRO, wraplength=400)
+        lbl_msg.pack(pady=(0, 10))
+
+        def cadastrar():
+            email = e_email.get().strip()
+            nome  = e_nome.get().strip()
+
+            if "@" not in email or "." not in email:
+                lbl_msg.configure(text="Digite um email válido.", text_color=COR_ERRO)
+                return
+
+            btn.configure(state="disabled", text="Criando conta...")
+            win.update()
+
+            try:
+                r = httpx.post(f"{API_URL}/cadastro",
+                               json={"email": email, "nome": nome}, timeout=15)
+
+                if r.status_code == 200:
+                    lbl_msg.configure(
+                        text="✓  Conta criada! Verifique seu email e copie a chave de acesso.",
+                        text_color=COR_VERDE)
+                    btn.configure(state="disabled", text="Email enviado ✓")
+                    # Botão para voltar à ativação
+                    ctk.CTkButton(
+                        body, text="← Inserir minha chave",
+                        command=lambda: (win.destroy(), self._tela_ativacao(root)),
+                        fg_color=COR_AZUL, hover_color="#1D4ED8",
+                        font=ctk.CTkFont("Segoe UI", 11, "bold"),
+                        corner_radius=10, height=38,
+                    ).pack(fill="x", pady=(8, 0))
+
+                else:
+                    detalhe = r.json().get("detail", "Erro ao criar conta.")
+                    lbl_msg.configure(text=detalhe, text_color=COR_ERRO)
+                    btn.configure(state="normal", text="Criar conta grátis")
+
+            except Exception as e:
+                lbl_msg.configure(text=f"Erro de conexão: {e}", text_color=COR_ERRO)
+                btn.configure(state="normal", text="Criar conta grátis")
+
+        btn = ctk.CTkButton(
+            body, text="Criar conta grátis",
+            command=cadastrar,
+            fg_color=COR_VERDE, hover_color="#047857",
+            font=ctk.CTkFont("Segoe UI", 12, "bold"),
+            corner_radius=10, height=42,
+        )
+        btn.pack(fill="x", pady=(0, 10))
+
+        ctk.CTkButton(
+            body, text="← Já tenho uma chave",
+            command=lambda: (win.destroy(), self._tela_ativacao(root)),
+            fg_color="#E2E8F0", hover_color="#CBD5E1",
+            text_color=COR_TEXTO,
+            font=ctk.CTkFont("Segoe UI", 10),
+            corner_radius=10, height=34,
+        ).pack(fill="x")
+
+        win.wait_window()
+
+    # ══════════════════════════════════════════════════════════════════
+    # TELA DE PAGAMENTO (QR Code PIX)
+    # ══════════════════════════════════════════════════════════════════
+    def _tela_pagamento(self, root: ctk.CTk, chave: str):
+        win = ctk.CTkToplevel()
+        win.title("Renovar acesso — Calculadora DAS")
+        win.geometry("500x620")
+        win.configure(fg_color=COR_CARD)
+        win.resizable(False, False)
+        win.protocol("WM_DELETE_WINDOW", sys.exit)
+        win.grab_set()
+        win.focus_force()
+
+        _header(win, "💳  Renovar acesso — R$ 4,99/mês")
+
+        body = ctk.CTkFrame(win, fg_color=COR_CARD)
+        body.pack(fill="both", expand=True, padx=28, pady=16)
+
+        ctk.CTkLabel(body,
+                     text="Seu período gratuito encerrou.",
+                     font=ctk.CTkFont("Segoe UI", 13, "bold"),
+                     text_color=COR_TEXTO).pack(pady=(0, 4))
+
+        ctk.CTkLabel(body,
+                     text="Pague R$ 4,99 via PIX para continuar usando.\nO acesso é liberado automaticamente após o pagamento.",
+                     font=ctk.CTkFont("Segoe UI", 11),
+                     text_color=COR_SUB, justify="center").pack(pady=(0, 14))
+
+        # Campo email
+        ctk.CTkLabel(body, text="SEU EMAIL (para identificar o pagamento)",
+                     font=ctk.CTkFont("Segoe UI", 9, "bold"),
+                     text_color=COR_SUB).pack(anchor="w")
+        e_email = ctk.CTkEntry(body, placeholder_text="seu@email.com",
+                               fg_color="#F8FAFC", border_color=COR_BORDA,
+                               text_color=COR_TEXTO, height=40, corner_radius=10)
+        e_email.pack(fill="x", pady=(2, 10))
+
+        # Frame do QR code (oculto até gerar)
+        frame_qr = ctk.CTkFrame(body, fg_color=COR_FUNDO, corner_radius=12)
+        lbl_qr_img  = ctk.CTkLabel(frame_qr, text="")
+        lbl_pix_key = ctk.CTkEntry(frame_qr, font=ctk.CTkFont("Segoe UI", 9),
+                                   fg_color="#F8FAFC", border_color=COR_BORDA,
+                                   text_color=COR_SUB, height=32, corner_radius=8,
+                                   state="readonly", justify="center")
+        lbl_copiado = ctk.CTkLabel(frame_qr, text="",
+                                   font=ctk.CTkFont("Segoe UI", 10),
+                                   text_color=COR_VERDE)
+        lbl_status  = ctk.CTkLabel(body, text="",
+                                   font=ctk.CTkFont("Segoe UI", 11),
+                                   text_color=COR_SUB)
+
+        lbl_msg = ctk.CTkLabel(body, text="",
+                               font=ctk.CTkFont("Segoe UI", 10),
+                               text_color=COR_ERRO, wraplength=420)
+        lbl_msg.pack()
+
+        self._polling_ativo = False
+
+        def gerar():
+            email = e_email.get().strip()
+            if "@" not in email:
+                lbl_msg.configure(text="Digite um email válido.", text_color=COR_ERRO)
+                return
+
+            btn_gerar.configure(state="disabled", text="Gerando QR Code...")
+            win.update()
+
+            try:
+                r = httpx.post(f"{API_URL}/pagamento/gerar",
+                               json={"chave": chave, "email": email}, timeout=20)
+
+                if r.status_code != 200:
+                    lbl_msg.configure(text=r.json().get("detail", "Erro ao gerar pagamento."),
+                                      text_color=COR_ERRO)
+                    btn_gerar.configure(state="normal", text="Gerar QR Code PIX")
+                    return
+
+                data       = r.json()
+                payment_id = data["payment_id"]
+                qr_b64     = data["qr_code_base64"]
+                pix_code   = data["qr_code"]
+
+                # Exibe QR code
+                img_bytes = base64.b64decode(qr_b64)
+                img       = Image.open(io.BytesIO(img_bytes)).resize((220, 220))
+                ctk_img   = ctk.CTkImage(img, size=(220, 220))
+
+                frame_qr.pack(fill="x", pady=(8, 0))
+                ctk.CTkLabel(frame_qr,
+                             text="Escaneie o QR Code ou copie o código PIX:",
+                             font=ctk.CTkFont("Segoe UI", 10),
+                             text_color=COR_SUB).pack(pady=(12, 6))
+
+                lbl_qr_img.configure(image=ctk_img)
+                lbl_qr_img.pack(pady=(0, 8))
+
+                lbl_pix_key.configure(state="normal")
+                lbl_pix_key.delete(0, "end")
+                lbl_pix_key.insert(0, pix_code)
+                lbl_pix_key.configure(state="readonly")
+                lbl_pix_key.pack(fill="x", padx=12, pady=(0, 4))
+
+                def copiar_pix():
+                    win.clipboard_clear()
+                    win.clipboard_append(pix_code)
+                    lbl_copiado.configure(text="✓ Código copiado!")
+                    win.after(2000, lambda: lbl_copiado.configure(text=""))
+
+                ctk.CTkButton(
+                    frame_qr, text="📋  Copiar código PIX",
+                    command=copiar_pix,
+                    fg_color=COR_AZUL, hover_color="#1D4ED8",
+                    font=ctk.CTkFont("Segoe UI", 10, "bold"),
+                    corner_radius=8, height=34,
+                ).pack(padx=12, pady=(0, 4))
+
+                lbl_copiado.pack(pady=(0, 8))
+
+                lbl_status.pack(pady=(10, 0))
+                lbl_status.configure(text="⏳ Aguardando pagamento...")
+                btn_gerar.configure(text="QR Code gerado ✓")
+
+                # Inicia polling
+                self._polling_ativo = True
+                self._iniciar_polling(win, root, payment_id, lbl_status)
+
+            except Exception as e:
+                lbl_msg.configure(text=f"Erro: {e}", text_color=COR_ERRO)
+                btn_gerar.configure(state="normal", text="Gerar QR Code PIX")
+
+        btn_gerar = ctk.CTkButton(
+            body, text="Gerar QR Code PIX",
+            command=gerar,
+            fg_color=COR_AZUL, hover_color="#1D4ED8",
+            font=ctk.CTkFont("Segoe UI", 12, "bold"),
+            corner_radius=10, height=42,
+        )
+        btn_gerar.pack(fill="x", pady=(8, 0))
+
+        win.wait_window()
+
+    def _iniciar_polling(self, win, root, payment_id: int, lbl_status):
+        """Verifica a cada 5 segundos se o pagamento foi confirmado."""
+
+        def _poll():
+            if not self._polling_ativo:
+                return
+            try:
+                r = httpx.get(f"{API_URL}/pagamento/status/{payment_id}", timeout=8)
+                if r.status_code == 200:
+                    status = r.json().get("status")
+                    if status == "approved":
+                        self._polling_ativo = False
+                        root.after(0, lambda: self._pagamento_confirmado(win, root))
+                        return
+            except Exception:
+                pass
+
+            # Agenda próxima verificação em 5 segundos
+            root.after(5000, _poll_thread)
+
+        def _poll_thread():
+            threading.Thread(target=_poll, daemon=True).start()
+
+        _poll_thread()
+
+    def _pagamento_confirmado(self, win, root):
+        """Chamado quando o pagamento é confirmado."""
+        win.destroy()
+
+        ok_win = ctk.CTkToplevel()
+        ok_win.title("Pagamento confirmado!")
+        ok_win.geometry("400x220")
+        ok_win.configure(fg_color=COR_CARD)
+        ok_win.resizable(False, False)
+        ok_win.grab_set()
+
+        hdr = ctk.CTkFrame(ok_win, fg_color=COR_VERDE, corner_radius=0, height=50)
+        hdr.pack(fill="x")
+        hdr.pack_propagate(False)
+        ctk.CTkLabel(hdr, text="✓  Pagamento confirmado!",
+                     font=ctk.CTkFont("Segoe UI", 14, "bold"),
+                     text_color="white").pack(padx=20, pady=12)
+
+        body = ctk.CTkFrame(ok_win, fg_color=COR_CARD)
+        body.pack(fill="both", expand=True, padx=28, pady=20)
+
+        ctk.CTkLabel(body,
+                     text="Seu acesso foi renovado por 30 dias.\nObrigado por assinar a Calculadora DAS!",
+                     font=ctk.CTkFont("Segoe UI", 12),
+                     text_color=COR_TEXTO, justify="center").pack(pady=(0, 20))
+
+        def abrir():
+            ok_win.destroy()
+            root.deiconify()
+            self._verificar_update(root)
+
+        ctk.CTkButton(ok_win, text="Acessar o sistema →",
+                      command=abrir,
+                      fg_color=COR_VERDE, hover_color="#047857",
+                      font=ctk.CTkFont("Segoe UI", 12, "bold"),
+                      corner_radius=10, height=40).pack(padx=28, pady=(0, 16))
+
+        ok_win.wait_window()
+
+    # ══════════════════════════════════════════════════════════════════
+    # UPDATE AUTOMÁTICO
+    # ══════════════════════════════════════════════════════════════════
     def _verificar_update(self, root: ctk.CTk):
         def _check():
             try:
@@ -182,7 +543,6 @@ class LicenseManager:
 
         threading.Thread(target=_check, daemon=True).start()
 
-    # ── Popup de update ───────────────────────────────────────────────
     def _popup_update(self, root: ctk.CTk, data: dict):
         win = ctk.CTkToplevel(root)
         win.title("Atualização disponível")
@@ -192,11 +552,10 @@ class LicenseManager:
         win.transient(root)
         win.grab_set()
 
-        # Header verde
         hdr = ctk.CTkFrame(win, fg_color=COR_VERDE, corner_radius=0, height=50)
         hdr.pack(fill="x")
         hdr.pack_propagate(False)
-        ctk.CTkLabel(hdr, text=f"🆕  Nova versão disponível: {data['versao']}",
+        ctk.CTkLabel(hdr, text=f"🆕  Nova versão: {data['versao']}",
                      font=ctk.CTkFont("Segoe UI", 13, "bold"),
                      text_color="white").pack(side="left", padx=16, pady=12)
 
@@ -204,7 +563,7 @@ class LicenseManager:
         body.pack(fill="both", expand=True, padx=28, pady=20)
 
         ctk.CTkLabel(body,
-                     text=f"Versão atual: {VERSAO_ATUAL}   →   Nova versão: {data['versao']}",
+                     text=f"Versão atual: {VERSAO_ATUAL}   →   Nova: {data['versao']}",
                      font=ctk.CTkFont("Segoe UI", 11, "bold"),
                      text_color=COR_TEXTO).pack(pady=(0, 6))
 
@@ -213,15 +572,13 @@ class LicenseManager:
                          font=ctk.CTkFont("Segoe UI", 10),
                          text_color=COR_SUB, wraplength=370).pack(pady=(0, 12))
 
-        # Barra de progresso (oculta até clicar Sim)
         lbl_prog = ctk.CTkLabel(body, text="",
                                 font=ctk.CTkFont("Segoe UI", 10),
                                 text_color=COR_SUB)
         lbl_prog.pack()
 
         barra = ctk.CTkProgressBar(body, width=360, height=12,
-                                   corner_radius=6,
-                                   fg_color="#E2E8F0",
+                                   corner_radius=6, fg_color="#E2E8F0",
                                    progress_color=COR_VERDE)
         barra.set(0)
 
@@ -234,41 +591,34 @@ class LicenseManager:
 
             def _download():
                 try:
-                    url = data["url"]
-
-                    # Descobre tamanho total
-                    head = httpx.head(url, follow_redirects=True, timeout=10)
+                    url   = data["url"]
+                    head  = httpx.head(url, follow_redirects=True, timeout=10)
                     total = int(head.headers.get("content-length", 0))
 
-                    # Salva na mesma pasta do executável atual
-                    if hasattr(sys, "_MEIPASS"):
-                        dest_dir = os.path.dirname(sys.executable)
-                    else:
-                        dest_dir = os.path.dirname(os.path.abspath(__file__))
-
-                    installer_path = os.path.join(dest_dir, "_update_installer.exe")
+                    dest_dir = (os.path.dirname(sys.executable)
+                                if hasattr(sys, "_MEIPASS")
+                                else os.path.dirname(os.path.abspath(__file__)))
+                    installer = os.path.join(dest_dir, "_update_installer.exe")
 
                     baixado = 0
                     with httpx.stream("GET", url, follow_redirects=True, timeout=60) as resp:
-                        with open(installer_path, "wb") as f:
+                        with open(installer, "wb") as f:
                             for chunk in resp.iter_bytes(chunk_size=65536):
                                 f.write(chunk)
                                 baixado += len(chunk)
                                 if total > 0:
-                                    pct = baixado / total
-                                    mb_baixado = baixado / 1_048_576
-                                    mb_total   = total   / 1_048_576
-                                    root.after(0, lambda p=pct, b=mb_baixado, t=mb_total: (
+                                    p = baixado / total
+                                    b = baixado / 1_048_576
+                                    t = total   / 1_048_576
+                                    root.after(0, lambda p=p, b=b, t=t: (
                                         barra.set(p),
                                         lbl_prog.configure(
-                                            text=f"Baixando... {b:.1f} MB de {t:.1f} MB  ({p*100:.0f}%)"
-                                        )
+                                            text=f"Baixando... {b:.1f} MB / {t:.1f} MB  ({p*100:.0f}%)")
                                     ))
 
-                    root.after(0, lambda: lbl_prog.configure(
-                        text="✓ Download concluído. Iniciando instalação..."))
+                    root.after(0, lambda: lbl_prog.configure(text="✓ Download concluído. Instalando..."))
                     root.after(0, lambda: barra.set(1))
-                    root.after(800, lambda: _instalar(installer_path))
+                    root.after(800, lambda: _instalar(installer))
 
                 except Exception as e:
                     root.after(0, lambda: lbl_prog.configure(
@@ -277,16 +627,11 @@ class LicenseManager:
                         state="normal", text="Tentar novamente"))
                     root.after(0, lambda: btn_nao.configure(state="normal"))
 
-            def _instalar(installer_path):
-                """
-                Executa o instalador Inno Setup com flag /silent.
-                O instalador vai: fechar o app atual → substituir o .exe → reabrir.
-                """
+            def _instalar(path):
                 try:
                     subprocess.Popen(
-                        [installer_path, "/silent", "/closeapplications", "/restartapplications"],
-                        creationflags=subprocess.DETACHED_PROCESS
-                            if sys.platform == "win32" else 0
+                        [path, "/silent", "/closeapplications", "/restartapplications"],
+                        creationflags=subprocess.DETACHED_PROCESS if sys.platform == "win32" else 0
                     )
                     root.after(500, root.destroy)
                     root.after(600, sys.exit)
