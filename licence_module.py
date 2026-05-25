@@ -11,7 +11,7 @@ import httpx
 
 # ── Configuração ──────────────────────────────────────────────────────
 API_URL      = "https://sistemasn-production.up.railway.app"
-VERSAO_ATUAL = "1.1.9"
+VERSAO_ATUAL = "1.1.10"
 CHAVE_FILE   = os.path.join(os.path.expanduser("~"), ".das_licenca")
 
 # ── Cores ─────────────────────────────────────────────────────────────
@@ -67,7 +67,13 @@ def _base_win(root, titulo, w, h):
     win.geometry(f"{w}x{h}")
     win.configure(fg_color=COR_CARD)
     win.resizable(False, False)
-    win.protocol("WM_DELETE_WINDOW", sys.exit)
+    def fechar():
+        self._polling_ativo = False
+        win.destroy()
+        root.destroy()
+        sys.exit(0)
+
+    win.protocol("WM_DELETE_WINDOW", fechar)
     win.grab_set()
     win.focus_force()
     return win
@@ -327,16 +333,18 @@ class LicenseManager:
     def _tela_pagamento(self, root: ctk.CTk, chave: str):
         win = ctk.CTkToplevel()
         win.title("Renovar acesso — Calculadora DAS")
-        win.geometry("500x620")
+        win.geometry("500x680")          # ← altura maior como padrão
+        win.minsize(480, 500)            # ← tamanho mínimo
         win.configure(fg_color=COR_CARD)
-        win.resizable(False, False)
+        win.resizable(False, True)       # ← permite redimensionar verticalmente
         win.protocol("WM_DELETE_WINDOW", sys.exit)
         win.grab_set()
         win.focus_force()
 
         _header(win, "💳  Renovar acesso — R$ 4,99/mês")
 
-        body = ctk.CTkFrame(win, fg_color=COR_CARD)
+        # ← Troca CTkFrame por CTkScrollableFrame
+        body = ctk.CTkScrollableFrame(win, fg_color=COR_CARD)
         body.pack(fill="both", expand=True, padx=28, pady=16)
 
         ctk.CTkLabel(body,
