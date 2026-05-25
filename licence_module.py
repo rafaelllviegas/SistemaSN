@@ -11,7 +11,7 @@ import httpx
 
 # ── Configuração ──────────────────────────────────────────────────────
 API_URL      = "https://sistemasn-production.up.railway.app"
-VERSAO_ATUAL = "1.1.8"
+VERSAO_ATUAL = "1.1.9"
 CHAVE_FILE   = os.path.join(os.path.expanduser("~"), ".das_licenca")
 
 # ── Cores ─────────────────────────────────────────────────────────────
@@ -463,22 +463,21 @@ class LicenseManager:
         win.wait_window()
 
     def _iniciar_polling(self, win, root, payment_id: int, lbl_status):
-        """Verifica a cada 5 segundos se o pagamento foi confirmado."""
-
         def _poll():
             if not self._polling_ativo:
                 return
             try:
-                # Verifica diretamente o status da licença
-                r = httpx.post(
-                    f"{API_URL}/validar",
-                    json={"chave": self._chave, "machine_id": self.machine_id},
+                # Consulta status do pagamento diretamente no backend
+                r = httpx.get(
+                    f"{API_URL}/pagamento/status/{payment_id}",
                     timeout=8,
                 )
                 if r.status_code == 200:
-                    self._polling_ativo = False
-                    root.after(0, lambda: self._pagamento_confirmado(win, root))
-                    return
+                    status = r.json().get("status")
+                    if status == "approved":
+                        self._polling_ativo = False
+                        root.after(0, lambda: self._pagamento_confirmado(win, root))
+                        return
             except Exception:
                 pass
 

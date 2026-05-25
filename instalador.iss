@@ -5,7 +5,7 @@
 
 [Setup]
 AppName=Calculadora DAS
-AppVersion=1.1.8
+AppVersion=1.1.9
 AppPublisher=Rafael Viegas
 DefaultDirName={autopf}\Calculadora DAS
 DefaultGroupName=Calculadora DAS
