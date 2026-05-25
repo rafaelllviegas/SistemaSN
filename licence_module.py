@@ -11,7 +11,7 @@ import httpx
 
 # ── Configuração ──────────────────────────────────────────────────────
 API_URL      = "https://sistemasn-production.up.railway.app"
-VERSAO_ATUAL = "1.1.9"
+VERSAO_ATUAL = "1.1.10"
 CHAVE_FILE   = os.path.join(os.path.expanduser("~"), ".das_licenca")
 
 # ── Cores ─────────────────────────────────────────────────────────────
@@ -459,73 +459,95 @@ class LicenseManager:
             corner_radius=10, height=42,
         )
         btn_gerar.pack(fill="x", pady=(8, 0))
+        
+        # Aviso de fallback
+        aviso = ctk.CTkFrame(body, fg_color="#FEF3C7", corner_radius=10)
+        aviso.pack(fill="x", pady=(12, 0))
+
+        ctk.CTkLabel(
+            aviso,
+            text="⚠️  Após realizar o pagamento PIX",
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
+            text_color="#92400E",
+        ).pack(pady=(10, 2))
+
+        ctk.CTkLabel(
+            aviso,
+            text="Feche e abra o programa novamente.\nSeu acesso será liberado automaticamente!",
+            font=ctk.CTkFont("Segoe UI", 10),
+            text_color="#92400E",
+            justify="center",
+        ).pack(pady=(0, 10))
 
         win.wait_window()
 
     def _iniciar_polling(self, win, root, payment_id: int, lbl_status):
-        def _poll():
-            if not self._polling_ativo:
+    def _check():
+        if not self._polling_ativo:
+            return
+        try:
+            r = httpx.get(f"{API_URL}/pagamento/status/{payment_id}", timeout=5)
+            if r.status_code == 200 and r.json().get("status") == "approved":
+                self._polling_ativo = False
+                try:
+                    win.after(0, lambda: self._pagamento_confirmado(win, root))
+                except Exception:
+                    pass
                 return
-            try:
-                # Consulta status do pagamento diretamente no backend
-                r = httpx.get(
-                    f"{API_URL}/pagamento/status/{payment_id}",
-                    timeout=8,
-                )
-                if r.status_code == 200:
-                    status = r.json().get("status")
-                    if status == "approved":
-                        self._polling_ativo = False
-                        root.after(0, lambda: self._pagamento_confirmado(win, root))
-                        return
-            except Exception:
-                pass
+        except Exception:
+            pass
+        try:
+            win.after(5000, lambda: threading.Thread(target=_check, daemon=True).start())
+        except Exception:
+            pass
 
-            root.after(5000, _poll_thread)
-
-        def _poll_thread():
-            threading.Thread(target=_poll, daemon=True).start()
-
-        _poll_thread()
+    threading.Thread(target=_check, daemon=True).start()
 
     def _pagamento_confirmado(self, win, root):
-        """Chamado quando o pagamento é confirmado."""
-        win.destroy()
+    try:
+        for widget in win.winfo_children():
+            widget.destroy()
+    except Exception:
+        return
 
-        ok_win = ctk.CTkToplevel()
-        ok_win.title("Pagamento confirmado!")
-        ok_win.geometry("400x220")
-        ok_win.configure(fg_color=COR_CARD)
-        ok_win.resizable(False, False)
-        ok_win.grab_set()
+    win.configure(fg_color=COR_VERDE)
 
-        hdr = ctk.CTkFrame(ok_win, fg_color=COR_VERDE, corner_radius=0, height=50)
-        hdr.pack(fill="x")
-        hdr.pack_propagate(False)
-        ctk.CTkLabel(hdr, text="✓  Pagamento confirmado!",
-                     font=ctk.CTkFont("Segoe UI", 14, "bold"),
-                     text_color="white").pack(padx=20, pady=12)
+    body = ctk.CTkFrame(win, fg_color=COR_VERDE)
+    body.pack(fill="both", expand=True, padx=40, pady=40)
 
-        body = ctk.CTkFrame(ok_win, fg_color=COR_CARD)
-        body.pack(fill="both", expand=True, padx=28, pady=20)
+    ctk.CTkLabel(body, text="✓",
+                 font=ctk.CTkFont("Segoe UI", 56, "bold"),
+                 text_color="white").pack(pady=(0, 10))
 
-        ctk.CTkLabel(body,
-                     text="Seu acesso foi renovado por 30 dias.\nObrigado por assinar a Calculadora DAS!",
-                     font=ctk.CTkFont("Segoe UI", 12),
-                     text_color=COR_TEXTO, justify="center").pack(pady=(0, 20))
+    ctk.CTkLabel(body, text="Pagamento confirmado!",
+                 font=ctk.CTkFont("Segoe UI", 18, "bold"),
+                 text_color="white").pack()
 
-        def abrir():
-            ok_win.destroy()
-            root.deiconify()
-            self._verificar_update(root)
+    ctk.CTkLabel(body, text="Seu acesso foi renovado por 30 dias.",
+                 font=ctk.CTkFont("Segoe UI", 12),
+                 text_color="white").pack(pady=(6, 0))
 
-        ctk.CTkButton(ok_win, text="Acessar o sistema →",
-                      command=abrir,
-                      fg_color=COR_VERDE, hover_color="#047857",
-                      font=ctk.CTkFont("Segoe UI", 12, "bold"),
-                      corner_radius=10, height=40).pack(padx=28, pady=(0, 16))
+    lbl = ctk.CTkLabel(body, text="Abrindo o sistema em 3...",
+                       font=ctk.CTkFont("Segoe UI", 11),
+                       text_color="white")
+    lbl.pack(pady=(16, 0))
 
-        ok_win.wait_window()
+    def countdown(n):
+        if n <= 0:
+            try:
+                win.destroy()
+                root.deiconify()
+                self._verificar_update(root)
+            except Exception:
+                pass
+            return
+        try:
+            lbl.configure(text=f"Abrindo o sistema em {n}...")
+            win.after(1000, lambda: countdown(n - 1))
+        except Exception:
+            pass
+
+    win.after(800, lambda: countdown(3))
 
     # ══════════════════════════════════════════════════════════════════
     # UPDATE AUTOMÁTICO
