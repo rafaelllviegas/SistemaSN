@@ -334,7 +334,6 @@ class LicenseManager:
         def fechar():
             self._polling_ativo = False
             win.destroy()
-            root.destroy()
             sys.exit(0)
 
         win.protocol("WM_DELETE_WINDOW", fechar)
