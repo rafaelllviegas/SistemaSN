@@ -160,9 +160,7 @@ def cadastro(req: CadastroRequest):
 
     # Notifica o admin
     threading.Thread(
-        target=enviar_email,
-        args=("viegas.rafaelll@gmail.com", chave, f"NOVO CLIENTE: {nome} ({req.email}) — Chave: {chave}"),
-        daemon=True
+        target=enviar_email, args=(req.email, chave, nome), daemon=True
     ).start()
 
     return {
@@ -486,12 +484,6 @@ def publicar_versao(req: NovaVersaoRequest):
         }
     ).execute()
     return {"mensagem": f"Versão {req.versao} publicada."}
-
-
-@app.get("/admin/testar-email", dependencies=[Depends(admin_required)])
-def testar_email(destinatario: str):
-    ok = enviar_email(destinatario, "XXXX-TEST-TEST-TEST", "Teste")
-    return {"ok": ok}
 
 @app.get("/")
 def health():
