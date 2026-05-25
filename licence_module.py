@@ -11,7 +11,7 @@ import httpx
 
 # ── Configuração ──────────────────────────────────────────────────────
 API_URL      = "https://sistemasn-production.up.railway.app"
-VERSAO_ATUAL = "1.1.7"
+VERSAO_ATUAL = "1.1.8"
 CHAVE_FILE   = os.path.join(os.path.expanduser("~"), ".das_licenca")
 
 # ── Cores ─────────────────────────────────────────────────────────────
@@ -469,17 +469,19 @@ class LicenseManager:
             if not self._polling_ativo:
                 return
             try:
-                r = httpx.get(f"{API_URL}/pagamento/status/{payment_id}", timeout=8)
+                # Verifica diretamente o status da licença
+                r = httpx.post(
+                    f"{API_URL}/validar",
+                    json={"chave": self._chave, "machine_id": self.machine_id},
+                    timeout=8,
+                )
                 if r.status_code == 200:
-                    status = r.json().get("status")
-                    if status == "approved":
-                        self._polling_ativo = False
-                        root.after(0, lambda: self._pagamento_confirmado(win, root))
-                        return
+                    self._polling_ativo = False
+                    root.after(0, lambda: self._pagamento_confirmado(win, root))
+                    return
             except Exception:
                 pass
 
-            # Agenda próxima verificação em 5 segundos
             root.after(5000, _poll_thread)
 
         def _poll_thread():
