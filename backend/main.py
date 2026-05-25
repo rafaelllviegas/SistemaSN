@@ -84,7 +84,9 @@ def enviar_email(destinatario: str, chave: str, nome: str = ""):
 
         msg.attach(MIMEText(corpo, "html"))
 
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as servidor:
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=10) as servidor:
+            servidor.ehlo()
+            servidor.starttls()
             servidor.login(EMAIL_USER, EMAIL_PASS)
             servidor.sendmail(EMAIL_USER, destinatario, msg.as_string())
 
