@@ -303,10 +303,6 @@ def status_pagamento(payment_id: int):
 
 @app.post("/pagamento/webhook")
 async def webhook_pagamento(request: Request):
-    """
-    Mercado Pago chama esta rota quando o pagamento é confirmado.
-    Ativa/renova a licença automaticamente.
-    """
     try:
         body = await request.json()
     except Exception:
@@ -328,52 +324,36 @@ async def webhook_pagamento(request: Request):
         return {"ok": True}
 
     data = resp.json()
-    status = data.get("status")
+    if data.get("status") != "approved":
+        return {"ok": True}
 
-    if status != "approved":
+    # Busca licença pelo metadata
+    chave = data.get("metadata", {}).get("chave")
+    if not chave:
         return {"ok": True}
 
     db = get_db()
-
-    # Busca pagamento no banco
-    pag = (
-        db.table("pagamentos")
-        .select("*")
-        .eq("mp_payment_id", int(mp_payment_id))
-        .execute()
-    )
-    if not pag.data:
-        return {"ok": True}
-
-    pagamento = pag.data[0]
-
-    if pagamento["status"] == "approved":
-        return {"ok": True}  # já processado
-
-    # Atualiza pagamento
-    db.table("pagamentos").update(
-        {
-            "status": "approved",
-            "pago_em": datetime.now(timezone.utc).isoformat(),
-        }
-    ).eq("mp_payment_id", int(mp_payment_id)).execute()
-
-    # Renova licença por 30 dias
-    lic = db.table("licencas").select("*").eq("id", pagamento["licenca_id"]).execute()
+    lic = db.table("licencas").select("*").eq("chave", chave).execute()
     if not lic.data:
         return {"ok": True}
 
-    licenca = lic.data[0]
     expira_em = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
+    db.table("licencas").update({
+        "status": "ativa",
+        "plano": "ativo",
+        "expira_em": expira_em,
+    }).eq("chave", chave).execute()
 
-    db.table("licencas").update(
-        {
-            "status": "ativa",
-            "plano": "ativo",
-            "expira_em": expira_em,
-        }
-    ).eq("id", pagamento["licenca_id"]).execute()
+    # Atualiza pagamento se existir
+    try:
+        db.table("pagamentos").update({
+            "status": "approved",
+            "pago_em": datetime.now(timezone.utc).isoformat(),
+        }).eq("mp_payment_id", int(mp_payment_id)).execute()
+    except Exception:
+        pass
 
+    print(f"Pagamento aprovado: {mp_payment_id} — chave: {chave}")
     return {"ok": True}
 
 
