@@ -10,7 +10,6 @@ from pydantic import BaseModel
 from supabase import create_client, Client
 from datetime import datetime, timezone, timedelta
 import os, secrets, string, httpx
-import resend
 import threading
 
 app = FastAPI(title="DAS Licenser API", version="2.0.0") 
@@ -28,7 +27,7 @@ SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 ADMIN_SECRET = os.environ["ADMIN_SECRET"]
 MP_ACCESS_TOKEN = os.environ["MP_ACCESS_TOKEN"]
 EMAIL_USER = os.environ["EMAIL_USER"]
-RESEND_API_KEY = os.environ["RESEND_API_KEY"]
+BREVO_API_KEY = os.environ["BREVO_API_KEY"]
 API_BASE_URL = os.environ.get(
     "API_BASE_URL", "https://sistemasn-production.up.railway.app"
 )
@@ -56,12 +55,16 @@ def admin_required(x_admin_secret: str = Header(...)):
 
 def enviar_email(destinatario: str, chave: str, nome: str = ""):
     try:
-        resend.api_key = RESEND_API_KEY
-        resend.Emails.send({
-            "from": "Calculadora DAS <onboarding@resend.dev>",
-            "to": destinatario,
+        headers = {
+            "accept": "application/json",
+            "api-key": BREVO_API_KEY,
+            "content-type": "application/json",
+        }
+        payload = {
+            "sender": {"name": "Calculadora DAS", "email": "noreply@sistemasn.com"},
+            "to": [{"email": destinatario}],
             "subject": "🔑 Sua chave de acesso — Calculadora DAS",
-            "html": f"""
+            "htmlContent": f"""
             <div style="font-family:Segoe UI,sans-serif;max-width:480px;margin:0 auto;">
               <div style="background:#1E3A5F;padding:24px 32px;border-radius:16px 16px 0 0;">
                 <h2 style="color:white;margin:0;">📊 Calculadora DAS</h2>
@@ -76,8 +79,17 @@ def enviar_email(destinatario: str, chave: str, nome: str = ""):
               </div>
             </div>
             """,
-        })
-        return True
+        }
+        r = httpx.post(
+            "https://api.brevo.com/v3/smtp/email",
+            json=payload,
+            headers=headers,
+            timeout=10,
+        )
+        if r.status_code in (200, 201):
+            return True
+        print(f"Erro Brevo: {r.status_code} {r.text}")
+        return False
     except Exception as e:
         print(f"Erro ao enviar email: {e}")
         return False
