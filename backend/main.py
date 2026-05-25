@@ -13,7 +13,7 @@ import os, secrets, string, httpx
 import resend
 import threading
 
-app = FastAPI(title="DAS Licenser API", version="2.0.0")
+app = FastAPI(title="DAS Licenser API", version="2.0.0") 
 
 app.add_middleware(
     CORSMiddleware,
