@@ -11,7 +11,7 @@ import httpx
 
 # ── Configuração ──────────────────────────────────────────────────────
 API_URL      = "https://sistemasn-production.up.railway.app"
-VERSAO_ATUAL = "1.1.10"
+VERSAO_ATUAL = "1.1.9"
 CHAVE_FILE   = os.path.join(os.path.expanduser("~"), ".das_licenca")
 
 # ── Cores ─────────────────────────────────────────────────────────────
@@ -482,72 +482,72 @@ class LicenseManager:
         win.wait_window()
 
     def _iniciar_polling(self, win, root, payment_id: int, lbl_status):
-    def _check():
-        if not self._polling_ativo:
-            return
+        def _check():
+            if not self._polling_ativo:
+                return
+            try:
+                r = httpx.get(f"{API_URL}/pagamento/status/{payment_id}", timeout=5)
+                if r.status_code == 200 and r.json().get("status") == "approved":
+                    self._polling_ativo = False
+                    try:
+                        win.after(0, lambda: self._pagamento_confirmado(win, root))
+                    except Exception:
+                        pass
+                    return
+            except Exception:
+                pass
+            try:
+                win.after(5000, lambda: threading.Thread(target=_check, daemon=True).start())
+            except Exception:
+                pass
+
+        threading.Thread(target=_check, daemon=True).start()
+
+    def _pagamento_confirmado(self, win, root):
         try:
-            r = httpx.get(f"{API_URL}/pagamento/status/{payment_id}", timeout=5)
-            if r.status_code == 200 and r.json().get("status") == "approved":
-                self._polling_ativo = False
+            for widget in win.winfo_children():
+                widget.destroy()
+        except Exception:
+            return
+
+        win.configure(fg_color=COR_VERDE)
+
+        body = ctk.CTkFrame(win, fg_color=COR_VERDE)
+        body.pack(fill="both", expand=True, padx=40, pady=40)
+
+        ctk.CTkLabel(body, text="✓",
+                    font=ctk.CTkFont("Segoe UI", 56, "bold"),
+                    text_color="white").pack(pady=(0, 10))
+
+        ctk.CTkLabel(body, text="Pagamento confirmado!",
+                    font=ctk.CTkFont("Segoe UI", 18, "bold"),
+                    text_color="white").pack()
+
+        ctk.CTkLabel(body, text="Seu acesso foi renovado por 30 dias.",
+                    font=ctk.CTkFont("Segoe UI", 12),
+                    text_color="white").pack(pady=(6, 0))
+
+        lbl = ctk.CTkLabel(body, text="Abrindo o sistema em 3...",
+                        font=ctk.CTkFont("Segoe UI", 11),
+                        text_color="white")
+        lbl.pack(pady=(16, 0))
+
+        def countdown(n):
+            if n <= 0:
                 try:
-                    win.after(0, lambda: self._pagamento_confirmado(win, root))
+                    win.destroy()
+                    root.deiconify()
+                    self._verificar_update(root)
                 except Exception:
                     pass
                 return
-        except Exception:
-            pass
-        try:
-            win.after(5000, lambda: threading.Thread(target=_check, daemon=True).start())
-        except Exception:
-            pass
-
-    threading.Thread(target=_check, daemon=True).start()
-
-    def _pagamento_confirmado(self, win, root):
-    try:
-        for widget in win.winfo_children():
-            widget.destroy()
-    except Exception:
-        return
-
-    win.configure(fg_color=COR_VERDE)
-
-    body = ctk.CTkFrame(win, fg_color=COR_VERDE)
-    body.pack(fill="both", expand=True, padx=40, pady=40)
-
-    ctk.CTkLabel(body, text="✓",
-                 font=ctk.CTkFont("Segoe UI", 56, "bold"),
-                 text_color="white").pack(pady=(0, 10))
-
-    ctk.CTkLabel(body, text="Pagamento confirmado!",
-                 font=ctk.CTkFont("Segoe UI", 18, "bold"),
-                 text_color="white").pack()
-
-    ctk.CTkLabel(body, text="Seu acesso foi renovado por 30 dias.",
-                 font=ctk.CTkFont("Segoe UI", 12),
-                 text_color="white").pack(pady=(6, 0))
-
-    lbl = ctk.CTkLabel(body, text="Abrindo o sistema em 3...",
-                       font=ctk.CTkFont("Segoe UI", 11),
-                       text_color="white")
-    lbl.pack(pady=(16, 0))
-
-    def countdown(n):
-        if n <= 0:
             try:
-                win.destroy()
-                root.deiconify()
-                self._verificar_update(root)
+                lbl.configure(text=f"Abrindo o sistema em {n}...")
+                win.after(1000, lambda: countdown(n - 1))
             except Exception:
                 pass
-            return
-        try:
-            lbl.configure(text=f"Abrindo o sistema em {n}...")
-            win.after(1000, lambda: countdown(n - 1))
-        except Exception:
-            pass
 
-    win.after(800, lambda: countdown(3))
+        win.after(800, lambda: countdown(3))
 
     # ══════════════════════════════════════════════════════════════════
     # UPDATE AUTOMÁTICO
