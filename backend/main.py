@@ -9,9 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from supabase import create_client, Client
 from datetime import datetime, timezone, timedelta
-import os, secrets, string, httpx, smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import os, secrets, string, httpx
+import resend
 import threading
 
 app = FastAPI(title="DAS Licenser API", version="2.0.0")
@@ -29,7 +28,7 @@ SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 ADMIN_SECRET = os.environ["ADMIN_SECRET"]
 MP_ACCESS_TOKEN = os.environ["MP_ACCESS_TOKEN"]
 EMAIL_USER = os.environ["EMAIL_USER"]
-EMAIL_PASS = os.environ["EMAIL_PASS"]
+RESEND_API_KEY = os.environ["RESEND_API_KEY"]
 API_BASE_URL = os.environ.get(
     "API_BASE_URL", "https://sistemasn-production.up.railway.app"
 )
@@ -57,39 +56,27 @@ def admin_required(x_admin_secret: str = Header(...)):
 
 def enviar_email(destinatario: str, chave: str, nome: str = ""):
     try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = "🔑 Sua chave de acesso — Calculadora DAS"
-        msg["From"] = EMAIL_USER
-        msg["To"] = destinatario
-
-        corpo = f"""
-        <html><body style="font-family: Segoe UI, sans-serif; background:#F1F5F9; padding:32px;">
-          <div style="max-width:480px; margin:0 auto; background:#fff; border-radius:16px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,0.08);">
-            <div style="background:#1E3A5F; padding:24px 32px;">
-              <h2 style="color:white; margin:0;">📊 Calculadora DAS — Simples Nacional</h2>
-            </div>
-            <div style="padding:32px;">
-              <p style="color:#1E293B; font-size:16px;">Olá{(' ' + nome) if nome else ''}! Sua conta foi criada com sucesso.</p>
-              <p style="color:#64748B;">Sua chave de acesso é:</p>
-              <div style="background:#F1F5F9; border-radius:10px; padding:20px; text-align:center; margin:20px 0;">
-                <span style="font-size:24px; font-weight:bold; letter-spacing:4px; color:#2563EB;">{chave}</span>
+        resend.api_key = RESEND_API_KEY
+        resend.Emails.send({
+            "from": "Calculadora DAS <onboarding@resend.dev>",
+            "to": destinatario,
+            "subject": "🔑 Sua chave de acesso — Calculadora DAS",
+            "html": f"""
+            <div style="font-family:Segoe UI,sans-serif;max-width:480px;margin:0 auto;">
+              <div style="background:#1E3A5F;padding:24px 32px;border-radius:16px 16px 0 0;">
+                <h2 style="color:white;margin:0;">📊 Calculadora DAS</h2>
               </div>
-              <p style="color:#64748B; font-size:14px;">Você tem <strong>30 dias gratuitos</strong>. Após esse período, o acesso custa <strong>R$ 4,99/mês</strong>, renovado via PIX.</p>
-              <hr style="border:none; border-top:1px solid #E2E8F0; margin:24px 0;">
-              <p style="color:#94A3B8; font-size:12px;">Se você não criou esta conta, ignore este email.</p>
+              <div style="background:#fff;padding:32px;border-radius:0 0 16px 16px;border:1px solid #E2E8F0;">
+                <p>Olá{(' ' + nome) if nome else ''}! Sua conta foi criada com sucesso.</p>
+                <p style="color:#64748B;">Sua chave de acesso é:</p>
+                <div style="background:#F1F5F9;border-radius:10px;padding:20px;text-align:center;margin:20px 0;">
+                  <span style="font-size:24px;font-weight:bold;letter-spacing:4px;color:#2563EB;">{chave}</span>
+                </div>
+                <p style="color:#64748B;font-size:14px;">Você tem <strong>30 dias gratuitos</strong>. Após esse período, o acesso custa <strong>R$ 4,99/mês</strong> via PIX.</p>
+              </div>
             </div>
-          </div>
-        </body></html>
-        """
-
-        msg.attach(MIMEText(corpo, "html"))
-
-        with smtplib.SMTP("smtp.gmail.com", 587, timeout=10) as servidor:
-            servidor.ehlo()
-            servidor.starttls()
-            servidor.login(EMAIL_USER, EMAIL_PASS)
-            servidor.sendmail(EMAIL_USER, destinatario, msg.as_string())
-
+            """,
+        })
         return True
     except Exception as e:
         print(f"Erro ao enviar email: {e}")
