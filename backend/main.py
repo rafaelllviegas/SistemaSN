@@ -61,7 +61,7 @@ def enviar_email(destinatario: str, chave: str, nome: str = ""):
             "content-type": "application/json",
         }
         payload = {
-            "sender": {"name": "Calculadora DAS", "email": "noreply@sistemasn.com"},
+            "sender": {"name": "Calculadora DAS", "email": "viegas.rafaelll@gmail.com"},
             "to": [{"email": destinatario}],
             "subject": "🔑 Sua chave de acesso — Calculadora DAS",
             "htmlContent": f"""
