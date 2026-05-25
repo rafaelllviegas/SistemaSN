@@ -67,7 +67,7 @@ def _base_win(root, titulo, w, h):
     win.geometry(f"{w}x{h}")
     win.configure(fg_color=COR_CARD)
     win.resizable(False, False)
-    win.protocol("WM_DELETE_WINDOW", sys.exit)
+    win.protocol("WM_DELETE_WINDOW", lambda: os._exit(0))
     win.grab_set()
     win.focus_force()
     return win
@@ -230,6 +230,15 @@ class LicenseManager:
 
         body = ctk.CTkFrame(win, fg_color=COR_CARD)
         body.pack(fill="both", expand=True, padx=32, pady=24)
+
+        ctk.CTkButton(
+            body, text="← Voltar",
+            command=lambda: (win.destroy(), self._tela_ativacao(root)),
+            fg_color="#E2E8F0", hover_color="#CBD5E1",
+            text_color=COR_TEXTO,
+            font=ctk.CTkFont("Segoe UI", 10),
+            corner_radius=10, height=32,
+        ).pack(anchor="w", pady=(0, 12))
 
         ctk.CTkLabel(body, text="30 dias grátis, sem cartão de crédito",
                      font=ctk.CTkFont("Segoe UI", 13, "bold"),
