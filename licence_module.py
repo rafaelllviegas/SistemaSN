@@ -67,13 +67,7 @@ def _base_win(root, titulo, w, h):
     win.geometry(f"{w}x{h}")
     win.configure(fg_color=COR_CARD)
     win.resizable(False, False)
-    def fechar():
-        self._polling_ativo = False
-        win.destroy()
-        root.destroy()
-        sys.exit(0)
-
-    win.protocol("WM_DELETE_WINDOW", fechar)
+    win.protocol("WM_DELETE_WINDOW", sys.exit)
     win.grab_set()
     win.focus_force()
     return win
@@ -337,7 +331,13 @@ class LicenseManager:
         win.minsize(480, 500)            # ← tamanho mínimo
         win.configure(fg_color=COR_CARD)
         win.resizable(False, True)       # ← permite redimensionar verticalmente
-        win.protocol("WM_DELETE_WINDOW", sys.exit)
+        def fechar():
+            self._polling_ativo = False
+            win.destroy()
+            root.destroy()
+            sys.exit(0)
+
+        win.protocol("WM_DELETE_WINDOW", fechar)
         win.grab_set()
         win.focus_force()
 
