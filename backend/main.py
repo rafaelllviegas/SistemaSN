@@ -495,8 +495,8 @@ def publicar_versao(req: NovaVersaoRequest):
 
 @app.get("/admin/testar-email", dependencies=[Depends(admin_required)])
 def testar_email(destinatario: str):
+    ok = enviar_email(destinatario, "XXXX-TEST-TEST-TEST", "Teste")
     return {"ok": ok}
-
 
 @app.get("/")
 def health():
