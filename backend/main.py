@@ -1,3 +1,4 @@
+# backend/main.py
 """
 Backend de Licenciamento — Calculadora DAS
 Hospedagem: Railway  |  Banco: Supabase  |  Pagamento: Mercado Pago
@@ -11,6 +12,7 @@ from datetime import datetime, timezone, timedelta
 import os, secrets, string, httpx, smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import threading
 
 app = FastAPI(title="DAS Licenser API", version="2.0.0")
 
@@ -145,7 +147,8 @@ def cadastro(req: CadastroRequest):
         "plano":         "trial",
     }).execute()
 
-    email_ok = enviar_email(req.email, chave, nome)
+    threading.Thread(target=enviar_email, args=(req.email, chave, nome), daemon=True).start()
+    email_ok = True
 
     return {
         "mensagem":  "Conta criada com sucesso! Verifique seu email.",

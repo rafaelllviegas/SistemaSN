@@ -1,3 +1,4 @@
+# licence_module.py
 """
 Módulo de Licenciamento — Calculadora DAS
 Inclui: ativação, cadastro, trial, pagamento PIX e update automático.
@@ -10,7 +11,7 @@ import httpx
 
 # ── Configuração ──────────────────────────────────────────────────────
 API_URL      = "https://sistemasn-production.up.railway.app"
-VERSAO_ATUAL = "1.1.5"
+VERSAO_ATUAL = "1.1.6"
 CHAVE_FILE   = os.path.join(os.path.expanduser("~"), ".das_licenca")
 
 # ── Cores ─────────────────────────────────────────────────────────────
