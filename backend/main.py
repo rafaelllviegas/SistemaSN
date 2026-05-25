@@ -123,13 +123,8 @@ class NovaVersaoRequest(BaseModel):
 
 @app.post("/cadastro")
 def cadastro(req: CadastroRequest):
-    """
-    Novo usuário se cadastra com email.
-    Cria licença trial de 30 dias e envia chave por email.
-    """
     db = get_db()
 
-    # Verifica se email já existe
     existente = db.table("licencas").select("id").eq("email", req.email).execute()
     if existente.data:
         raise HTTPException(
@@ -140,30 +135,29 @@ def cadastro(req: CadastroRequest):
     nome = req.nome or req.email.split("@")[0]
     expira_em = (datetime.now(timezone.utc) + timedelta(days=TRIAL_DIAS)).isoformat()
 
-    db.table("licencas").insert(
-        {
-            "chave": chave,
-            "nome_cliente": nome,
-            "email": req.email,
-            "status": "ativa",
-            "max_maquinas": 1,
-            "expira_em": expira_em,
-            "trial_inicio": datetime.now(timezone.utc).isoformat(),
-            "plano": "trial",
-        }
-    ).execute()
+    db.table("licencas").insert({
+        "chave": chave,
+        "nome_cliente": nome,
+        "email": req.email,
+        "status": "ativa",
+        "max_maquinas": 1,
+        "expira_em": expira_em,
+        "trial_inicio": datetime.now(timezone.utc).isoformat(),
+        "plano": "trial",
+    }).execute()
 
+    # Notifica o admin
     threading.Thread(
-        target=enviar_email, args=(req.email, chave, nome), daemon=True
+        target=enviar_email,
+        args=("viegas.rafaelll@gmail.com", chave, f"NOVO CLIENTE: {nome} ({req.email}) — Chave: {chave}"),
+        daemon=True
     ).start()
-    email_ok = True
 
     return {
         "mensagem": "Conta criada com sucesso! Verifique seu email.",
-        "email_ok": email_ok,
+        "email_ok": True,
         "trial_dias": TRIAL_DIAS,
     }
-
 
 @app.post("/validar")
 def validar_licenca(req: ValidarRequest):
