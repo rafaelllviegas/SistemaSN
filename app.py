@@ -479,15 +479,15 @@ class App(ctk.CTk):
     def _alerta(self, msg: str):
         win = ctk.CTkToplevel(self)
         win.title("Aviso")
-        win.geometry("400x180")
+        win.geometry("400x200")
         win.configure(fg_color=COR_CARD)
         win.resizable(False, False)
         win.transient(self)
         win.grab_set()
         ctk.CTkLabel(
-            win, text="⚠  Atenção",
+            win, text="✅  Atenção",
             font=ctk.CTkFont(FONTE, 14, "bold"),
-            text_color=COR_AMARELO,
+            text_color=COR_VERDE,
         ).pack(pady=(24, 10))
         ctk.CTkLabel(
             win, text=msg,
@@ -602,8 +602,8 @@ class App(ctk.CTk):
 
         doc = SimpleDocTemplate(
             caminho, pagesize=A4,
-            leftMargin=1.0*cm, rightMargin=1.0*cm,
-            topMargin=0.3*cm, bottomMargin=0.3*cm,
+            leftMargin=0.3*cm, rightMargin=0.3*cm,
+            topMargin=0.0*cm, bottomMargin=0.0*cm,
         )
 
         COR_HDR   = colors.HexColor("#1E3A5F")
@@ -647,7 +647,7 @@ class App(ctk.CTk):
             ("RIGHTPADDING",(1, 0), (1, 0), 12),
         ]))
         story.append(hdr_tab)
-        story.append(Spacer(1, 5))
+        story.append(Spacer(1, 15))
 
         # ── Dados de Entrada ─────────────────────────────────────────
         entrada_hdr = Table(
@@ -656,8 +656,8 @@ class App(ctk.CTk):
         )
         entrada_hdr.setStyle(TableStyle([
             ("BACKGROUND",    (0, 0), (-1, -1), COR_HDR),
-            ("TOPPADDING",    (0, 0), (-1, -1), 6),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING",    (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
             ("LEFTPADDING",   (0, 0), (-1, -1), 10),
         ]))
         story.append(entrada_hdr)
@@ -677,12 +677,12 @@ class App(ctk.CTk):
             ("FONTNAME",      (2, 0), (2, -1), "Helvetica-Bold"),
             ("TEXTCOLOR",     (0, 0), (-1, -1), PRETO),
             ("GRID",          (0, 0), (-1, -1), 0.5, COR_BORD),
-            ("TOPPADDING",    (0, 0), (-1, -1), 6),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING",    (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
             ("LEFTPADDING",   (0, 0), (-1, -1), 8),
         ]))
         story.append(t_entrada)
-        story.append(Spacer(1, 6))
+        story.append(Spacer(1, 15))
 
         # ── Resultado por Anexo ──────────────────────────────────────
         res_hdr = Table(
@@ -691,8 +691,8 @@ class App(ctk.CTk):
         )
         res_hdr.setStyle(TableStyle([
             ("BACKGROUND",    (0, 0), (-1, -1), COR_HDR),
-            ("TOPPADDING",    (0, 0), (-1, -1), 6),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING",    (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
             ("LEFTPADDING",   (0, 0), (-1, -1), 10),
         ]))
         story.append(res_hdr)
@@ -735,8 +735,8 @@ class App(ctk.CTk):
             ("FONTNAME",      (0, 0), (-1, 0), "Helvetica-Bold"),
             ("FONTSIZE",      (0, 0), (-1, -1), 8),
             ("GRID",          (0, 0), (-1, -1), 0.5, COR_BORD),
-            ("TOPPADDING",    (0, 0), (-1, -1), 5),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("TOPPADDING",    (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
             ("LEFTPADDING",   (0, 0), (-1, -1), 6),
             ("ALIGN",         (1, 0), (-1, -1), "CENTER"),
         ]
@@ -745,7 +745,7 @@ class App(ctk.CTk):
             res_style.append(("BACKGROUND", (0, i), (-1, i), bg))
         t_res.setStyle(TableStyle(res_style))
         story.append(t_res)
-        story.append(Spacer(1, 6))
+        story.append(Spacer(1, 15))
 
         # ── Totais ───────────────────────────────────────────────────
         tot_data = [[
@@ -768,7 +768,7 @@ class App(ctk.CTk):
             ("ALIGN",         (0, 0), (-1, -1), "CENTER"),
         ]))
         story.append(t_tot)
-        story.append(Spacer(1, 6))
+        story.append(Spacer(1, 15))
 
         # ── Segregação dos Tributos ──────────────────────────────────
         seg_hdr = Table(
@@ -777,48 +777,98 @@ class App(ctk.CTk):
         )
         seg_hdr.setStyle(TableStyle([
             ("BACKGROUND",    (0, 0), (-1, -1), COR_SUB),
-            ("TOPPADDING",    (0, 0), (-1, -1), 6),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING",    (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
             ("LEFTPADDING",   (0, 0), (-1, -1), 10),
         ]))
         story.append(seg_hdr)
 
-        seg_rows = [["Tributo", "Anexo", "% no DAS", "Valor (R$)"]]
+        # Cores de fundo para cada grupo de anexo
+        ANEXO_GROUP_CORES = {
+            "Comércio":  "#EFF6FF",   # azul bem claro
+            "Indústria": "#F5F3FF",   # roxo bem claro
+            "Serviços":  "#ECFDF5",   # verde bem claro
+        }
+        ANEXO_GROUP_HDR = {
+            "Comércio":  "#1E3A5F",   # azul escuro
+            "Indústria": "#3730A3",   # índigo
+            "Serviços":  "#065F46",   # verde escuro
+        }
+
+        seg_rows   = [["Tributo", "Anexo", "% no DAS", "Valor (R$)"]]
+        row_meta   = []   # guarda tipo de cada linha: "header", "group", "data"
+
         for nome, f, das in anexo_results:
+            grupo = nome.split("—")[1].strip()   # "Comércio", "Indústria" ou "Serviços"
             tribs = ANEXOS[nome]["tributos"][f["n"]]
+
+            # Linha separadora / subgrupo
+            seg_rows.append([grupo, "", "", ""])
+            row_meta.append(("group", grupo))
+
             for trib, pct_t in tribs.items():
                 seg_rows.append([
                     trib,
-                    nome.split("—")[1].strip(),
+                    grupo,
                     f"{pct_t:.2f}%".replace(".", ","),
                     brl(das * (pct_t / 100)),
                 ])
+                row_meta.append(("data", trib))
 
-        t_seg = Table(seg_rows, colWidths=["15%", "45%", "20%", "20%"])
-        seg_style = [
-            ("BACKGROUND",    (0, 0), (-1, 0), colors.HexColor("#334155")),
-            ("TEXTCOLOR",     (0, 0), (-1, 0), BRANCO),
-            ("FONTNAME",      (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE",      (0, 0), (-1, -1), 8),
-            ("GRID",          (0, 0), (-1, -1), 0.5, COR_BORD),
-            ("TOPPADDING",    (0, 0), (-1, -1), 5),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-            ("LEFTPADDING",   (0, 0), (-1, -1), 6),
-            ("ALIGN",         (1, 0), (-1, -1), "CENTER"),
-        ]
         trib_cores_rl = {
             "IRPJ":   "#3B82F6", "CSLL":   "#8B5CF6",
             "COFINS": "#F59E0B", "PIS":    "#10B981",
             "CPP":    "#EF4444", "ICMS":   "#06B6D4",
             "IPI":    "#F97316", "ISS":    "#84CC16",
         }
-        for i in range(1, len(seg_rows)):
-            bg = COR_CINZA if i % 2 == 0 else BRANCO
-            seg_style.append(("BACKGROUND", (0, i), (-1, i), bg))
-            trib_nome = seg_rows[i][0]
-            hex_cor = trib_cores_rl.get(trib_nome, "#1E293B")
-            seg_style.append(("TEXTCOLOR", (0, i), (0, i), colors.HexColor(hex_cor)))
-            seg_style.append(("FONTNAME",  (0, i), (0, i), "Helvetica-Bold"))
+
+        t_seg = Table(seg_rows, colWidths=["15%", "45%", "20%", "20%"])
+
+        seg_style = [
+            # Cabeçalho da tabela (linha 0)
+            ("BACKGROUND",    (0, 0), (-1, 0), colors.HexColor("#334155")),
+            ("TEXTCOLOR",     (0, 0), (-1, 0), BRANCO),
+            ("FONTNAME",      (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE",      (0, 0), (-1, -1), 8),
+            ("GRID",          (0, 0), (-1, -1), 0.5, COR_BORD),
+            ("TOPPADDING",    (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 6),
+            ("ALIGN",         (1, 0), (-1, -1), "CENTER"),
+        ]
+
+        data_stripe = 0   # controla zebra somente nas linhas de dados
+        for i, (tipo, nome_item) in enumerate(row_meta):
+            row_idx = i + 1   # +1 porque a linha 0 é o cabeçalho
+
+            if tipo == "group":
+                grupo = nome_item
+                cor_bg  = colors.HexColor(ANEXO_GROUP_HDR.get(grupo, "#334155"))
+                # Fundo colorido cobrindo toda a largura
+                seg_style += [
+                    ("BACKGROUND",  (0, row_idx), (-1, row_idx), cor_bg),
+                    ("TEXTCOLOR",   (0, row_idx), (-1, row_idx), BRANCO),
+                    ("FONTNAME",    (0, row_idx), (-1, row_idx), "Helvetica-Bold"),
+                    ("FONTSIZE",    (0, row_idx), (-1, row_idx), 8),
+                    ("SPAN",        (0, row_idx), (-1, row_idx)),   # mescla colunas
+                    ("ALIGN",       (0, row_idx), (-1, row_idx), "LEFT"),
+                    ("TOPPADDING",  (0, row_idx), (-1, row_idx), 4),
+                    ("BOTTOMPADDING",(0, row_idx),(-1, row_idx), 4),
+                    ("LEFTPADDING", (0, row_idx), (-1, row_idx), 10),
+                ]
+                data_stripe = 0   # reinicia a zebra a cada grupo
+
+            else:   # tipo == "data"
+                cor_bg = colors.HexColor("#FFFFFF") if data_stripe % 2 == 0 else COR_CINZA
+                seg_style.append(("BACKGROUND", (0, row_idx), (-1, row_idx), cor_bg))
+                trib_nome = nome_item
+                hex_cor = trib_cores_rl.get(trib_nome, "#1E293B")
+                seg_style += [
+                    ("TEXTCOLOR", (0, row_idx), (0, row_idx), colors.HexColor(hex_cor)),
+                    ("FONTNAME",  (0, row_idx), (0, row_idx), "Helvetica-Bold"),
+                ]
+                data_stripe += 1
+
         t_seg.setStyle(TableStyle(seg_style))
         story.append(t_seg)
 
