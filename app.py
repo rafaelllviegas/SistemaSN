@@ -3,6 +3,13 @@ import os
 import sys
 import customtkinter as ctk
 from PIL import Image
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import cm
+from datetime import datetime
+import tkinter.filedialog as filedialog
 
 # ── Tema ──────────────────────────────────────────────────────────────
 ctk.set_appearance_mode("light")
@@ -329,6 +336,15 @@ class App(ctk.CTk):
         self.lbl_pct.pack(side="left")
 
         ctk.CTkButton(
+            row_hint, text="⬇  Exportar PDF",
+            command=self._gerar_pdf,
+            fg_color=COR_ROXO, hover_color="#6D28D9",
+            font=ctk.CTkFont(FONTE, TAM_BTN, "bold"),
+            text_color="white",
+            corner_radius=10, height=ALTURA_BTN, width=150,
+        ).pack(side="right", padx=(8, 0))
+
+        ctk.CTkButton(
             row_hint, text="✕  Limpar",
             command=self._limpar,
             fg_color="#334155", hover_color="#475569",
@@ -359,7 +375,7 @@ class App(ctk.CTk):
         colunas  = ["Tributo", "Anexo", "% no DAS", "Valor (R$)"]
         larguras = [120, 240, 120, 180]
         self._cabecalho_tabela(body, colunas, larguras, 0)
-        self.rows_seg = self._linhas_tabela(body, 10, colunas, larguras, 1)
+        self.rows_seg = self._linhas_tabela(body, 21, colunas, larguras, 1)
 
     def _cabecalho_tabela(self, parent, colunas, larguras, row):
         hdr = ctk.CTkFrame(parent, fg_color=COR_CARD2, corner_radius=10, height=36)
@@ -557,7 +573,257 @@ class App(ctk.CTk):
         self.lbl_das.configure(text=brl(total_das))
         self.lbl_aliq.configure(text=f"{soma_aliq*100:.4f}%".replace(".", ","))
         self.lbl_faixa.configure(text=faixa_disp + " Faixa")
+    
+    def _gerar_pdf(self):
+        fat_txt  = self.e_fat.get()
+        rbt_txt  = self.e_rbt.get()
+        try:
+            fat = parse_moeda(fat_txt)
+            rbt = parse_moeda(rbt_txt)
+            p1  = parse_pct(self.e_p1.get())
+            p2  = parse_pct(self.e_p2.get())
+            p3  = parse_pct(self.e_p3.get())
+        except ValueError:
+            self._alerta("Calcule primeiro antes de exportar o PDF.")
+            return
 
+        if fat <= 0 or rbt <= 0:
+            self._alerta("Calcule primeiro antes de exportar o PDF.")
+            return
+
+        caminho = filedialog.asksaveasfilename(
+            defaultextension=".pdf",
+            filetypes=[("PDF", "*.pdf")],
+            initialfile="DAS_Simples_Nacional.pdf",
+            title="Salvar PDF",
+        )
+        if not caminho:
+            return
+
+        doc = SimpleDocTemplate(
+            caminho, pagesize=A4,
+            leftMargin=1.5*cm, rightMargin=1.5*cm,
+            topMargin=1.5*cm, bottomMargin=1.5*cm,
+        )
+
+        COR_HDR   = colors.HexColor("#1E3A5F")
+        COR_SUB   = colors.HexColor("#5B21B6")
+        COR_CINZA = colors.HexColor("#F1F5F9")
+        COR_BORD  = colors.HexColor("#E2E8F0")
+        BRANCO    = colors.white
+        PRETO     = colors.HexColor("#1E293B")
+
+        estilos = getSampleStyleSheet()
+        titulo_style = ParagraphStyle(
+            "titulo", parent=estilos["Normal"],
+            fontSize=16, textColor=BRANCO,
+            fontName="Helvetica-Bold",
+        )
+        sub_style = ParagraphStyle(
+            "sub", parent=estilos["Normal"],
+            fontSize=10, textColor=colors.HexColor("#64748B"),
+        )
+        card_titulo = ParagraphStyle(
+            "card_titulo", parent=estilos["Normal"],
+            fontSize=11, textColor=BRANCO,
+            fontName="Helvetica-Bold",
+        )
+
+        story = []
+
+        # ── Cabeçalho ────────────────────────────────────────────────
+        hdr_data = [[
+            Paragraph("Calculadora DAS — Simples Nacional", titulo_style),
+            Paragraph(f"Emitido em: {datetime.now().strftime('%d/%m/%Y %H:%M')}", sub_style),
+        ]]
+        hdr_tab = Table(hdr_data, colWidths=["70%", "30%"])
+        hdr_tab.setStyle(TableStyle([
+            ("BACKGROUND",  (0, 0), (-1, -1), COR_HDR),
+            ("VALIGN",      (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING",  (0, 0), (-1, -1), 10),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+            ("LEFTPADDING", (0, 0), (0, 0), 12),
+            ("ALIGN",       (1, 0), (1, 0), "RIGHT"),
+            ("RIGHTPADDING",(1, 0), (1, 0), 12),
+        ]))
+        story.append(hdr_tab)
+        story.append(Spacer(1, 10))
+
+        # ── Dados de Entrada ─────────────────────────────────────────
+        entrada_hdr = Table(
+            [[Paragraph("DADOS DE ENTRADA", card_titulo)]],
+            colWidths=["100%"],
+        )
+        entrada_hdr.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, -1), COR_HDR),
+            ("TOPPADDING",    (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 10),
+        ]))
+        story.append(entrada_hdr)
+
+        entrada_dados = [
+            ["Faturamento do Mês", brl(fat), "RBT12 (12 meses)", brl(rbt)],
+            ["Anexo I (%)",  f"{p1:.2f}%".replace(".", ","),
+             "Anexo II (%)", f"{p2:.2f}%".replace(".", ",")],
+            ["Anexo III (%)", f"{p3:.2f}%".replace(".", ","), "", ""],
+        ]
+        t_entrada = Table(entrada_dados, colWidths=["25%", "25%", "25%", "25%"])
+        t_entrada.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, -1), COR_CINZA),
+            ("FONTNAME",      (0, 0), (-1, -1), "Helvetica"),
+            ("FONTSIZE",      (0, 0), (-1, -1), 9),
+            ("FONTNAME",      (0, 0), (0, -1), "Helvetica-Bold"),
+            ("FONTNAME",      (2, 0), (2, -1), "Helvetica-Bold"),
+            ("TEXTCOLOR",     (0, 0), (-1, -1), PRETO),
+            ("GRID",          (0, 0), (-1, -1), 0.5, COR_BORD),
+            ("TOPPADDING",    (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 8),
+        ]))
+        story.append(t_entrada)
+        story.append(Spacer(1, 12))
+
+        # ── Resultado por Anexo ──────────────────────────────────────
+        res_hdr = Table(
+            [[Paragraph("RESULTADO POR ANEXO", card_titulo)]],
+            colWidths=["100%"],
+        )
+        res_hdr.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, -1), COR_HDR),
+            ("TOPPADDING",    (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 10),
+        ]))
+        story.append(res_hdr)
+
+        res_rows = [["Anexo", "Faixa", "Receita", "Alíq. Nominal", "Alíq. Efetiva", "DAS Parcial"]]
+        config = [
+            ("Anexo I — Comércio",   p1),
+            ("Anexo II — Indústria", p2),
+            ("Anexo III — Serviços", p3),
+        ]
+        total_das = 0.0
+        soma_aliq = 0.0
+        faixa_disp = "—"
+        anexo_results = []
+
+        for nome, pct in config:
+            if pct <= 0:
+                continue
+            rec = fat * (pct / 100)
+            f   = get_faixa(nome, rbt)
+            ae  = aliq_efetiva(rbt, f["al"], f["ded"])
+            das = rec * ae
+            total_das += das
+            soma_aliq += ae * (pct / 100)
+            faixa_disp = f"{f['n']}ª"
+            res_rows.append([
+                nome,
+                f"{f['n']}ª Faixa",
+                brl(rec),
+                f"{f['al']*100:.2f}%".replace(".", ","),
+                f"{ae*100:.4f}%".replace(".", ","),
+                brl(das),
+            ])
+            anexo_results.append((nome, f, das))
+
+        t_res = Table(res_rows, colWidths=["28%", "10%", "16%", "14%", "14%", "18%"])
+        res_style = [
+            ("BACKGROUND",    (0, 0), (-1, 0), colors.HexColor("#334155")),
+            ("TEXTCOLOR",     (0, 0), (-1, 0), BRANCO),
+            ("FONTNAME",      (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE",      (0, 0), (-1, -1), 8),
+            ("GRID",          (0, 0), (-1, -1), 0.5, COR_BORD),
+            ("TOPPADDING",    (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 6),
+            ("ALIGN",         (1, 0), (-1, -1), "CENTER"),
+        ]
+        for i in range(1, len(res_rows)):
+            bg = COR_CINZA if i % 2 == 0 else BRANCO
+            res_style.append(("BACKGROUND", (0, i), (-1, i), bg))
+        t_res.setStyle(TableStyle(res_style))
+        story.append(t_res)
+        story.append(Spacer(1, 12))
+
+        # ── Totais ───────────────────────────────────────────────────
+        tot_data = [[
+            Paragraph("<b>DAS TOTAL</b>", ParagraphStyle("x", parent=estilos["Normal"], fontSize=9, textColor=colors.HexColor("#64748B"))),
+            Paragraph("<b>ALÍQUOTA EFETIVA</b>", ParagraphStyle("x", parent=estilos["Normal"], fontSize=9, textColor=colors.HexColor("#64748B"))),
+            Paragraph("<b>FAIXA (RBT12)</b>", ParagraphStyle("x", parent=estilos["Normal"], fontSize=9, textColor=colors.HexColor("#64748B"))),
+        ],[
+            Paragraph(f'<font size="14" color="#059669"><b>{brl(total_das)}</b></font>', estilos["Normal"]),
+            Paragraph(f'<font size="14" color="#2563EB"><b>{soma_aliq*100:.4f}%</b></font>'.replace(".", ","), estilos["Normal"]),
+            Paragraph(f'<font size="14" color="#D97706"><b>{faixa_disp} Faixa</b></font>', estilos["Normal"]),
+        ]]
+        t_tot = Table(tot_data, colWidths=["33%", "33%", "34%"])
+        t_tot.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, -1), BRANCO),
+            ("BOX",           (0, 0), (-1, -1), 0.5, COR_BORD),
+            ("INNERGRID",     (0, 0), (-1, -1), 0.5, COR_BORD),
+            ("TOPPADDING",    (0, 0), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 10),
+            ("ALIGN",         (0, 0), (-1, -1), "CENTER"),
+        ]))
+        story.append(t_tot)
+        story.append(Spacer(1, 12))
+
+        # ── Segregação dos Tributos ──────────────────────────────────
+        seg_hdr = Table(
+            [[Paragraph("ESCALONAMENTO DOS TRIBUTOS", card_titulo)]],
+            colWidths=["100%"],
+        )
+        seg_hdr.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, -1), COR_SUB),
+            ("TOPPADDING",    (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 10),
+        ]))
+        story.append(seg_hdr)
+
+        seg_rows = [["Tributo", "Anexo", "% no DAS", "Valor (R$)"]]
+        for nome, f, das in anexo_results:
+            tribs = ANEXOS[nome]["tributos"][f["n"]]
+            for trib, pct_t in tribs.items():
+                seg_rows.append([
+                    trib,
+                    nome.split("—")[1].strip(),
+                    f"{pct_t:.2f}%".replace(".", ","),
+                    brl(das * (pct_t / 100)),
+                ])
+
+        t_seg = Table(seg_rows, colWidths=["15%", "45%", "20%", "20%"])
+        seg_style = [
+            ("BACKGROUND",    (0, 0), (-1, 0), colors.HexColor("#334155")),
+            ("TEXTCOLOR",     (0, 0), (-1, 0), BRANCO),
+            ("FONTNAME",      (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE",      (0, 0), (-1, -1), 8),
+            ("GRID",          (0, 0), (-1, -1), 0.5, COR_BORD),
+            ("TOPPADDING",    (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 6),
+            ("ALIGN",         (1, 0), (-1, -1), "CENTER"),
+        ]
+        trib_cores_rl = {
+            "IRPJ":   "#3B82F6", "CSLL":   "#8B5CF6",
+            "COFINS": "#F59E0B", "PIS":    "#10B981",
+            "CPP":    "#EF4444", "ICMS":   "#06B6D4",
+            "IPI":    "#F97316", "ISS":    "#84CC16",
+        }
+        for i in range(1, len(seg_rows)):
+            bg = COR_CINZA if i % 2 == 0 else BRANCO
+            seg_style.append(("BACKGROUND", (0, i), (-1, i), bg))
+            trib_nome = seg_rows[i][0]
+            hex_cor = trib_cores_rl.get(trib_nome, "#1E293B")
+            seg_style.append(("TEXTCOLOR", (0, i), (0, i), colors.HexColor(hex_cor)))
+            seg_style.append(("FONTNAME",  (0, i), (0, i), "Helvetica-Bold"))
+        t_seg.setStyle(TableStyle(seg_style))
+        story.append(t_seg)
+
+        doc.build(story)
+        self._alerta(f"PDF salvo com sucesso!\n{caminho}")
 
 # ── Execução ──────────────────────────────────────────────────────────
 if __name__ == "__main__":
