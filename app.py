@@ -807,12 +807,17 @@ class App(ctk.CTk):
             self._alerta("Calcule primeiro antes de exportar o PDF.")
             return
 
+        nome_empresa = self.e_empresa.get().strip()
+        data_hora = datetime.now().strftime("%d-%m-%Y %H-%M")
+        sufixo_empresa = f" - {nome_empresa}" if nome_empresa else ""
+
         caminho = filedialog.asksaveasfilename(
             defaultextension=".pdf",
             filetypes=[("PDF", "*.pdf")],
-            initialfile="DAS_Simples_Nacional.pdf",
+            initialfile=f"DAS_Simples_Nacional - {data_hora}{sufixo_empresa}.pdf",
             title="Salvar PDF",
         )
+
         if not caminho:
             return
 
