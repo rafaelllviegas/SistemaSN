@@ -929,29 +929,28 @@ class App(ctk.CTk):
         story.append(entrada_hdr)
 
         entrada_dados = [
-            ["Faturamento do Mês", brl(fat), "RBT12 (12 meses)", brl(rbt)],
-            [
-                "Anexo I (%)",
-                f"{p1:.2f}%".replace(".", ","),
-                "Anexo II (%)",
-                f"{p2:.2f}%".replace(".", ","),
-            ],
-            ["Anexo III (%)", f"{p3:.2f}%".replace(".", ","), "", ""],
+            ["Faturamento do Mês", brl(fat), "RBT12 (12 meses)", brl(rbt), "", ""],
+            ["Anexo I (%)", f"{p1:.2f}%".replace(".", ","),
+            "Anexo II (%)", f"{p2:.2f}%".replace(".", ","),
+            "Anexo III (%)", f"{p3:.2f}%".replace(".", ",")],
         ]
-        t_entrada = Table(entrada_dados, colWidths=["25%", "25%", "25%", "25%"])
+        t_entrada = Table(entrada_dados, colWidths=["17%", "16%", "17%", "16%", "17%", "17%"])
+
         t_entrada.setStyle(
             TableStyle(
                 [
-                    ("BACKGROUND", (0, 0), (-1, -1), COR_CINZA),
-                    ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
-                    ("FONTSIZE", (0, 0), (-1, -1), 9),
-                    ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-                    ("FONTNAME", (2, 0), (2, -1), "Helvetica-Bold"),
-                    ("TEXTCOLOR", (0, 0), (-1, -1), PRETO),
-                    ("GRID", (0, 0), (-1, -1), 0.5, COR_BORD),
-                    ("TOPPADDING", (0, 0), (-1, -1), 3),
+                    ("BACKGROUND",    (0, 0), (-1, -1), COR_CINZA),
+                    ("FONTNAME",      (0, 0), (-1, -1), "Helvetica"),
+                    ("FONTSIZE",      (0, 0), (-1, -1), 9),
+                    ("FONTNAME",      (0, 0), (0, -1),  "Helvetica-Bold"),
+                    ("FONTNAME",      (2, 0), (2, -1),  "Helvetica-Bold"),
+                    ("FONTNAME",      (4, 0), (4, -1),  "Helvetica-Bold"),
+                    ("TEXTCOLOR",     (0, 0), (-1, -1), PRETO),
+                    ("GRID",          (0, 0), (-1, -1), 0.5, COR_BORD),
+                    ("TOPPADDING",    (0, 0), (-1, -1), 3),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                    ("LEFTPADDING",   (0, 0), (-1, -1), 8),
+                    ("SPAN",          (4, 0), (5, 0)),
                 ]
             )
         )
