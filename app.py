@@ -602,8 +602,8 @@ class App(ctk.CTk):
 
         doc = SimpleDocTemplate(
             caminho, pagesize=A4,
-            leftMargin=1.5*cm, rightMargin=1.5*cm,
-            topMargin=1.5*cm, bottomMargin=1.5*cm,
+            leftMargin=1.0*cm, rightMargin=1.0*cm,
+            topMargin=0.3*cm, bottomMargin=0.3*cm,
         )
 
         COR_HDR   = colors.HexColor("#1E3A5F")
@@ -647,7 +647,7 @@ class App(ctk.CTk):
             ("RIGHTPADDING",(1, 0), (1, 0), 12),
         ]))
         story.append(hdr_tab)
-        story.append(Spacer(1, 10))
+        story.append(Spacer(1, 5))
 
         # ── Dados de Entrada ─────────────────────────────────────────
         entrada_hdr = Table(
@@ -682,7 +682,7 @@ class App(ctk.CTk):
             ("LEFTPADDING",   (0, 0), (-1, -1), 8),
         ]))
         story.append(t_entrada)
-        story.append(Spacer(1, 12))
+        story.append(Spacer(1, 6))
 
         # ── Resultado por Anexo ──────────────────────────────────────
         res_hdr = Table(
@@ -745,7 +745,7 @@ class App(ctk.CTk):
             res_style.append(("BACKGROUND", (0, i), (-1, i), bg))
         t_res.setStyle(TableStyle(res_style))
         story.append(t_res)
-        story.append(Spacer(1, 12))
+        story.append(Spacer(1, 6))
 
         # ── Totais ───────────────────────────────────────────────────
         tot_data = [[
@@ -768,7 +768,7 @@ class App(ctk.CTk):
             ("ALIGN",         (0, 0), (-1, -1), "CENTER"),
         ]))
         story.append(t_tot)
-        story.append(Spacer(1, 12))
+        story.append(Spacer(1, 6))
 
         # ── Segregação dos Tributos ──────────────────────────────────
         seg_hdr = Table(
