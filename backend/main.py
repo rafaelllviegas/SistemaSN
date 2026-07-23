@@ -465,14 +465,6 @@ def publicar_versao(req: NovaVersaoRequest):
     ).execute()
     return {"mensagem": f"Versão {req.versao} publicada."}
 
-@app.get("/debug/secret")
-def debug_secret():
-    return {
-        "tamanho": len(ADMIN_SECRET),
-        "inicio": ADMIN_SECRET[:4],
-        "fim": ADMIN_SECRET[-4:],
-    }
-
 @app.get("/")
 def health():
     return {"status": "online", "servico": "DAS Licenser API", "versao": "2.0.0"}
