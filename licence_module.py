@@ -10,7 +10,7 @@ from PIL import Image
 import httpx
 
 # ── Configuração ──────────────────────────────────────────────────────
-API_URL      = "https://sistemasn-production.up.railway.app"
+API_URL      = "https://calculadora-das-z1hd.onrender.com"
 VERSAO_ATUAL = "1.1.14"
 CHAVE_FILE   = os.path.join(os.path.expanduser("~"), ".das_licenca")
 
