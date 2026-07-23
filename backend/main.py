@@ -29,7 +29,7 @@ MP_ACCESS_TOKEN = os.environ["MP_ACCESS_TOKEN"]
 EMAIL_USER = os.environ["EMAIL_USER"]
 BREVO_API_KEY = os.environ["BREVO_API_KEY"]
 API_BASE_URL = os.environ.get(
-    "API_BASE_URL", "https://sistemasn-production.up.railway.app"
+    "API_BASE_URL", "https://calculadora-das-z1hd.onrender.com"
 )
 
 TRIAL_DIAS = 30
@@ -464,6 +464,14 @@ def publicar_versao(req: NovaVersaoRequest):
         }
     ).execute()
     return {"mensagem": f"Versão {req.versao} publicada."}
+
+@app.get("/debug/secret")
+def debug_secret():
+    return {
+        "tamanho": len(ADMIN_SECRET),
+        "inicio": ADMIN_SECRET[:4],
+        "fim": ADMIN_SECRET[-4:],
+    }
 
 @app.get("/")
 def health():
