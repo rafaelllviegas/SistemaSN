@@ -1,5 +1,7 @@
+# .gitignore
 # Ambiente virtual
 .venv/
+.venv2/
 
 # PyInstaller
 build/

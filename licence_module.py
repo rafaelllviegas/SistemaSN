@@ -11,7 +11,7 @@ import httpx
 
 # ── Configuração ──────────────────────────────────────────────────────
 API_URL      = "https://calculadora-das-z1hd.onrender.com"
-VERSAO_ATUAL = "1.1.14"
+VERSAO_ATUAL = "1.1.15"
 CHAVE_FILE   = os.path.join(os.path.expanduser("~"), ".das_licenca")
 
 # ── Cores ─────────────────────────────────────────────────────────────
@@ -184,6 +184,10 @@ class LicenseManager:
                 win.destroy()
                 self._tela_pagamento(root, chave)
 
+            elif codigo == 403 and "máquina" in (resultado or "").lower():
+                btn_ativar.configure(state="normal", text="Ativar")
+                self._oferecer_transferencia(win, root, chave, lbl_erro)
+
             else:
                 btn_ativar.configure(state="normal", text="Ativar")
                 lbl_erro.configure(text=resultado)
@@ -224,7 +228,7 @@ class LicenseManager:
     # TELA DE CADASTRO
     # ══════════════════════════════════════════════════════════════════
     def _tela_cadastro(self, root: ctk.CTk):
-        win = _base_win(root, "Criar conta — Calculadora DAS", 480, 420)
+        win = _base_win(root, "Criar conta — Calculadora DAS", 480, 520)
 
         _header(win, "✨  Criar conta gratuita")
 
@@ -353,7 +357,7 @@ class LicenseManager:
 
         # ← Troca CTkFrame por CTkScrollableFrame
         body = ctk.CTkScrollableFrame(win, fg_color=COR_CARD)
-        body.pack(fill="both", expand=True, padx=28, pady=16)
+        body.pack(fill="both", expand=True, padx=32, pady=24)
 
         ctk.CTkLabel(body,
                      text="Seu período gratuito encerrou.",
@@ -494,6 +498,145 @@ class LicenseManager:
             text_color="#92400E",
             justify="center",
         ).pack(pady=(0, 10))
+
+        win.wait_window()
+        
+    def _oferecer_transferencia(self, win_ativacao, root, chave, lbl_erro):
+        lbl_erro.configure(text="")
+        confirm = ctk.CTkToplevel(win_ativacao)
+        confirm.title("Transferir licença")
+        confirm.geometry("420x280")
+        confirm.configure(fg_color=COR_CARD)
+        confirm.resizable(False, False)
+        confirm.transient(win_ativacao)
+        confirm.grab_set()
+        confirm.focus_force()
+
+        body = ctk.CTkFrame(confirm, fg_color=COR_CARD)
+        body.pack(fill="both", expand=True, padx=28, pady=24)
+
+        ctk.CTkLabel(body, text="⚠️  Trocar de computador?",
+                    font=ctk.CTkFont("Segoe UI", 14, "bold"),
+                    text_color=COR_TEXTO).pack(pady=(0, 10))
+
+        ctk.CTkLabel(body,
+                    text="Essa chave já está ativada em outro computador.\n"
+                        "Vamos enviar um código de confirmação para o\n"
+                        "email cadastrado. O acesso no computador\n"
+                        "anterior será desativado.",
+                    font=ctk.CTkFont("Segoe UI", 11),
+                    text_color=COR_SUB, justify="center").pack(pady=(0, 20))
+
+        def confirmar():
+            confirm.destroy()
+            self._solicitar_codigo_transferencia(win_ativacao, root, chave, lbl_erro)
+
+        ctk.CTkButton(
+            body, text="Enviar código de confirmação",
+            command=confirmar,
+            fg_color=COR_AZUL, hover_color="#1D4ED8",
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
+            corner_radius=10, height=40,
+        ).pack(fill="x", pady=(0, 8))
+
+        ctk.CTkButton(
+            body, text="Cancelar",
+            command=confirm.destroy,
+            fg_color="#E2E8F0", hover_color="#CBD5E1",
+            text_color=COR_TEXTO,
+            font=ctk.CTkFont("Segoe UI", 10),
+            corner_radius=10, height=34,
+        ).pack(fill="x")
+
+    def _solicitar_codigo_transferencia(self, win_ativacao, root, chave, lbl_erro):
+        try:
+            r = httpx.post(
+                f"{API_URL}/transferir/solicitar",
+                json={"chave": chave, "machine_id": self.machine_id},
+                timeout=15,
+            )
+            if r.status_code == 200:
+                data = r.json()
+                self._tela_confirmar_codigo(win_ativacao, root, chave, data.get("email_mascarado", "seu email"))
+            else:
+                detail = r.json().get("detail", "Erro ao solicitar transferência.")
+                lbl_erro.configure(text=detail)
+        except Exception as e:
+            lbl_erro.configure(text=f"Erro: {e}")
+
+    def _tela_confirmar_codigo(self, win_ativacao, root, chave, email_mascarado):
+        win = _base_win(root, "Confirmar transferência", 420, 340)
+        _header(win, "📧  Confirmar transferência")
+
+        body = ctk.CTkFrame(win, fg_color=COR_CARD)
+        body.pack(fill="both", expand=True, padx=28, pady=24)
+
+        ctk.CTkLabel(body, text=f"Enviamos um código de 6 dígitos para:\n{email_mascarado}",
+                    font=ctk.CTkFont("Segoe UI", 11),
+                    text_color=COR_SUB, justify="center").pack(pady=(0, 6))
+
+        ctk.CTkLabel(body, text="O código expira em 15 minutos.",
+                    font=ctk.CTkFont("Segoe UI", 9),
+                    text_color=COR_SUB).pack(pady=(0, 16))
+
+        entry_codigo = ctk.CTkEntry(
+            body, placeholder_text="000000",
+            font=ctk.CTkFont("Segoe UI", 20, "bold"),
+            fg_color="#F8FAFC", border_color=COR_BORDA,
+            text_color=COR_TEXTO, height=48, corner_radius=10,
+            justify="center",
+        )
+        entry_codigo.pack(fill="x", pady=(0, 10))
+
+        lbl_msg = ctk.CTkLabel(body, text="", font=ctk.CTkFont("Segoe UI", 10),
+                                text_color=COR_ERRO, wraplength=360)
+        lbl_msg.pack(pady=(0, 10))
+
+        def confirmar():
+            codigo = entry_codigo.get().strip()
+            if len(codigo) != 6 or not codigo.isdigit():
+                lbl_msg.configure(text="Digite o código de 6 dígitos.")
+                return
+            btn.configure(state="disabled", text="Confirmando...")
+            win.update()
+            try:
+                r = httpx.post(
+                    f"{API_URL}/transferir/confirmar",
+                    json={"chave": chave, "machine_id": self.machine_id, "codigo": codigo},
+                    timeout=15,
+                )
+                if r.status_code == 200:
+                    data = r.json()
+                    salvar_chave(chave)
+                    self._chave  = chave
+                    self.cliente = data["cliente"]
+                    win.destroy()
+                    win_ativacao.destroy()
+                    root.deiconify()
+                    self._verificar_update(root)
+                else:
+                    detail = r.json().get("detail", "Código inválido.")
+                    lbl_msg.configure(text=detail)
+                    btn.configure(state="normal", text="Confirmar")
+            except Exception as e:
+                lbl_msg.configure(text=f"Erro: {e}")
+                btn.configure(state="normal", text="Confirmar")
+
+        btn = ctk.CTkButton(
+            body, text="Confirmar", command=confirmar,
+            fg_color=COR_AZUL, hover_color="#1D4ED8",
+            font=ctk.CTkFont("Segoe UI", 12, "bold"),
+            corner_radius=10, height=42,
+        )
+        btn.pack(fill="x", pady=(0, 8))
+
+        ctk.CTkButton(
+            body, text="Cancelar", command=win.destroy,
+            fg_color="#E2E8F0", hover_color="#CBD5E1",
+            text_color=COR_TEXTO,
+            font=ctk.CTkFont("Segoe UI", 10),
+            corner_radius=10, height=34,
+        ).pack(fill="x")
 
         win.wait_window()
 

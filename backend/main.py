@@ -33,6 +33,7 @@ API_BASE_URL = os.environ.get(
 )
 
 TRIAL_DIAS = 30
+COOLDOWN_TRANSFERENCIA_DIAS = 15
 VALOR_MENSAL = 4.99
 MP_API = "https://api.mercadopago.com"
 
@@ -94,8 +95,94 @@ def enviar_email(destinatario: str, chave: str, nome: str = ""):
         print(f"Erro ao enviar email: {e}")
         return False
 
+def gerar_codigo_verificacao() -> str:
+    return "".join(secrets.choice(string.digits) for _ in range(6))
+
+
+def mascarar_email(email: str) -> str:
+    try:
+        local, dominio = email.split("@")
+        if len(local) <= 2:
+            local_mascarado = local[0] + "*"
+        else:
+            local_mascarado = local[:2] + "*" * (len(local) - 2)
+        return f"{local_mascarado}@{dominio}"
+    except Exception:
+        return "seu email cadastrado"
+
+
+def enviar_codigo_transferencia(destinatario: str, codigo: str, nome: str = ""):
+    try:
+        headers = {
+            "accept": "application/json",
+            "api-key": BREVO_API_KEY,
+            "content-type": "application/json",
+        }
+        payload = {
+            "sender": {"name": "Calculadora DAS", "email": "viegas.rafaelll@gmail.com"},
+            "to": [{"email": destinatario}],
+            "subject": "🔐 Código para transferir seu acesso — Calculadora DAS",
+            "htmlContent": f"""
+            <div style="font-family:Segoe UI,sans-serif;max-width:480px;margin:0 auto;">
+              <div style="background:#1E3A5F;padding:24px 32px;border-radius:16px 16px 0 0;">
+                <h2 style="color:white;margin:0;">📊 Calculadora DAS</h2>
+              </div>
+              <div style="background:#fff;padding:32px;border-radius:0 0 16px 16px;border:1px solid #E2E8F0;">
+                <p>Olá{(' ' + nome) if nome else ''}! Alguém solicitou transferir sua licença para um novo computador.</p>
+                <p style="color:#64748B;">Se foi você, use o código abaixo (válido por 15 minutos):</p>
+                <div style="background:#F1F5F9;border-radius:10px;padding:20px;text-align:center;margin:20px 0;">
+                  <span style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#2563EB;">{codigo}</span>
+                </div>
+                <p style="color:#DC2626;font-size:13px;">Se você não pediu essa transferência, ignore este email e considere trocar de chave — entre em contato com o suporte.</p>
+              </div>
+            </div>
+            """,
+        }
+        r = httpx.post("https://api.brevo.com/v3/smtp/email", json=payload, headers=headers, timeout=10)
+        return r.status_code in (200, 201)
+    except Exception as e:
+        print(f"Erro ao enviar código de transferência: {e}")
+        return False
+
+
+def enviar_notificacao_transferencia(destinatario: str, nome: str = ""):
+    try:
+        headers = {
+            "accept": "application/json",
+            "api-key": BREVO_API_KEY,
+            "content-type": "application/json",
+        }
+        payload = {
+            "sender": {"name": "Calculadora DAS", "email": "viegas.rafaelll@gmail.com"},
+            "to": [{"email": destinatario}],
+            "subject": "✅ Sua licença foi transferida — Calculadora DAS",
+            "htmlContent": f"""
+            <div style="font-family:Segoe UI,sans-serif;max-width:480px;margin:0 auto;">
+              <div style="background:#059669;padding:24px 32px;border-radius:16px 16px 0 0;">
+                <h2 style="color:white;margin:0;">✅ Transferência concluída</h2>
+              </div>
+              <div style="background:#fff;padding:32px;border-radius:0 0 16px 16px;border:1px solid #E2E8F0;">
+                <p>Olá{(' ' + nome) if nome else ''}! Sua licença foi transferida para um novo computador em {datetime.now(timezone.utc).strftime('%d/%m/%Y às %H:%M')} (UTC).</p>
+                <p style="color:#DC2626;font-size:14px;"><strong>Não foi você?</strong> Entre em contato com o suporte imediatamente.</p>
+              </div>
+            </div>
+            """,
+        }
+        httpx.post("https://api.brevo.com/v3/smtp/email", json=payload, headers=headers, timeout=10)
+    except Exception as e:
+        print(f"Erro ao enviar notificação de transferência: {e}")
 
 # ── Schemas ───────────────────────────────────────────────────────────
+class TransferirSolicitarRequest(BaseModel):
+    chave: str
+    machine_id: str
+
+
+class TransferirConfirmarRequest(BaseModel):
+    chave: str
+    machine_id: str
+    codigo: str
+    
 class CadastroRequest(BaseModel):
     email: str
     nome: str = ""
@@ -228,6 +315,124 @@ def validar_licenca(req: ValidarRequest):
         "plano": lic["plano"],
     }
 
+@app.post("/transferir/solicitar")
+def solicitar_transferencia(req: TransferirSolicitarRequest):
+    db = get_db()
+
+    res = db.table("licencas").select("*").eq("chave", req.chave).execute()
+    if not res.data:
+        raise HTTPException(400, "Chave de licença inválida.")
+    lic = res.data[0]
+
+    if lic["status"] == "revogada":
+        raise HTTPException(403, "Licença revogada. Contate o suporte.")
+    if not lic.get("email"):
+        raise HTTPException(400, "Essa licença não possui email cadastrado. Contate o suporte.")
+
+    # Camada 2 — cooldown
+    if lic.get("ultima_transferencia"):
+        ultima = datetime.fromisoformat(lic["ultima_transferencia"].replace("Z", "+00:00"))
+        dias_desde = (datetime.now(timezone.utc) - ultima).days
+        if dias_desde < COOLDOWN_TRANSFERENCIA_DIAS:
+            raise HTTPException(
+                429,
+                f"Você já transferiu esta licença recentemente. "
+                f"Aguarde {COOLDOWN_TRANSFERENCIA_DIAS - dias_desde} dia(s) ou contate o suporte."
+            )
+
+    # Invalida códigos antigos pendentes
+    db.table("transferencia_solicitacoes").update({"usado": True}).eq(
+        "licenca_id", lic["id"]
+    ).eq("usado", False).execute()
+
+    codigo = gerar_codigo_verificacao()
+    expira_em = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
+
+    db.table("transferencia_solicitacoes").insert({
+        "licenca_id": lic["id"],
+        "codigo": codigo,
+        "machine_id_novo": req.machine_id,
+        "expira_em": expira_em,
+        "usado": False,
+    }).execute()
+
+    # Camada 1 — código só vai pro email cadastrado
+    threading.Thread(
+        target=enviar_codigo_transferencia,
+        args=(lic["email"], codigo, lic["nome_cliente"]),
+        daemon=True,
+    ).start()
+
+    return {
+        "mensagem": "Código de confirmação enviado.",
+        "email_mascarado": mascarar_email(lic["email"]),
+    }
+
+
+@app.post("/transferir/confirmar")
+def confirmar_transferencia(req: TransferirConfirmarRequest):
+    db = get_db()
+
+    res = db.table("licencas").select("*").eq("chave", req.chave).execute()
+    if not res.data:
+        raise HTTPException(400, "Chave de licença inválida.")
+    lic = res.data[0]
+
+    sol = (
+        db.table("transferencia_solicitacoes")
+        .select("*")
+        .eq("licenca_id", lic["id"])
+        .eq("codigo", req.codigo)
+        .eq("machine_id_novo", req.machine_id)
+        .eq("usado", False)
+        .order("criado_em", desc=True)
+        .limit(1)
+        .execute()
+    )
+    if not sol.data:
+        raise HTTPException(400, "Código inválido.")
+
+    solicitacao = sol.data[0]
+    expira = datetime.fromisoformat(solicitacao["expira_em"].replace("Z", "+00:00"))
+    if datetime.now(timezone.utc) > expira:
+        raise HTTPException(400, "Código expirado. Solicite um novo.")
+
+    # Camada 4 — captura máquina antiga pro log
+    maquinas_antigas = db.table("maquinas").select("machine_id").eq("licenca_id", lic["id"]).execute()
+    machine_id_antigo = maquinas_antigas.data[0]["machine_id"] if maquinas_antigas.data else None
+
+    db.table("maquinas").delete().eq("licenca_id", lic["id"]).execute()
+    db.table("maquinas").insert({"licenca_id": lic["id"], "machine_id": req.machine_id}).execute()
+
+    agora = datetime.now(timezone.utc).isoformat()
+    db.table("licencas").update({
+        "ultima_transferencia": agora,
+        "ultimo_acesso": agora,
+        "total_transferencias": (lic.get("total_transferencias") or 0) + 1,
+    }).eq("chave", req.chave).execute()
+
+    db.table("transferencia_solicitacoes").update({"usado": True}).eq("id", solicitacao["id"]).execute()
+
+    db.table("transferencias").insert({
+        "licenca_id": lic["id"],
+        "machine_id_antigo": machine_id_antigo,
+        "machine_id_novo": req.machine_id,
+    }).execute()
+
+    # Camada 3 — avisa o dono mesmo em transferência bem-sucedida
+    threading.Thread(
+        target=enviar_notificacao_transferencia,
+        args=(lic["email"], lic["nome_cliente"]),
+        daemon=True,
+    ).start()
+
+    return {
+        "valido": True,
+        "mensagem": "Licença transferida com sucesso.",
+        "cliente": lic["nome_cliente"],
+        "expira_em": lic["expira_em"],
+        "plano": lic["plano"],
+    }
 
 @app.post("/pagamento/gerar")
 def gerar_pagamento(req: GerarPagamentoRequest):
@@ -464,6 +669,21 @@ def publicar_versao(req: NovaVersaoRequest):
         }
     ).execute()
     return {"mensagem": f"Versão {req.versao} publicada."}
+
+@app.get("/admin/transferencias/{chave}", dependencies=[Depends(admin_required)])
+def historico_transferencias(chave: str):
+    db = get_db()
+    lic = db.table("licencas").select("id").eq("chave", chave).execute()
+    if not lic.data:
+        raise HTTPException(404, "Chave não encontrada.")
+    res = (
+        db.table("transferencias")
+        .select("*")
+        .eq("licenca_id", lic.data[0]["id"])
+        .order("criado_em", desc=True)
+        .execute()
+    )
+    return res.data
 
 @app.get("/")
 def health():
