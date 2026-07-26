@@ -11,7 +11,7 @@ import httpx
 
 # ── Configuração ──────────────────────────────────────────────────────
 API_URL      = "https://calculadora-das-z1hd.onrender.com"
-VERSAO_ATUAL = "1.1.17"
+VERSAO_ATUAL = "1.1.18"
 CHAVE_FILE   = os.path.join(os.path.expanduser("~"), ".das_licenca")
 
 # ── Cores ─────────────────────────────────────────────────────────────

@@ -10,6 +10,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
 from datetime import datetime
 import tkinter.filedialog as filedialog
+from licence_module import VERSAO_ATUAL
 
 # ── Tema ──────────────────────────────────────────────────────────────
 ctk.set_appearance_mode("light")
@@ -336,7 +337,7 @@ class App(ctk.CTk):
         except Exception:
             pass
 
-        self.title("Calculadora DAS — Simples Nacional")
+        self.title(f"Calculadora DAS — Simples Nacional - v{VERSAO_ATUAL}")
         self.geometry(f"{JANELA_W}x{JANELA_H}")
         self.configure(fg_color=COR_BG)
         self.resizable(True, True)
